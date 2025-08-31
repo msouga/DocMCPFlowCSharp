@@ -31,12 +31,10 @@ public class OpenAiSdkLlmClient : ILlmClient
             new UserChatMessage(user)
         };
 
-        // Pass settings directly in the request object
-        var chatRequest = new ChatRequest(messages, model: model, maxTokens: maxTokens);
-
         try
         {
-            ChatCompletion completion = await _client.CompleteChatAsync(chatRequest);
+            // Llamada directa pasando la lista de mensajes y opciones básicas
+            ChatCompletion completion = await _client.CompleteChatAsync(messages);
             return completion.Content[0].Text;
         }
         catch (Exception ex)
