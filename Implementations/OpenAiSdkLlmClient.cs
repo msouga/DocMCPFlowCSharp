@@ -33,8 +33,26 @@ public class OpenAiSdkLlmClient : ILlmClient
 
         try
         {
-            // Llamada directa pasando la lista de mensajes y opciones básicas
-            ChatCompletion completion = await _client.CompleteChatAsync(messages);
+            // Intentar configurar límite de tokens si la versión del SDK lo soporta
+            // Algunas versiones exponen un objeto de opciones para límites
+            ChatCompletion completion;
+            try
+            {
+                var options = new ChatCompletionOptions();
+                // Asignación defensiva: algunas versiones usan MaxOutputTokens y otras MaxTokens
+                // Usamos reflexión ligera para establecer la propiedad disponible.
+                var prop = options.GetType().GetProperty("MaxOutputTokens") ?? options.GetType().GetProperty("MaxTokens");
+                if (prop != null && prop.CanWrite)
+                {
+                    prop.SetValue(options, maxTokens);
+                }
+                completion = await _client.CompleteChatAsync(messages, options);
+            }
+            catch
+            {
+                // Fallback si el tipo de opciones no existe en esta versión
+                completion = await _client.CompleteChatAsync(messages);
+            }
             return completion.Content[0].Text;
         }
         catch (Exception ex)
