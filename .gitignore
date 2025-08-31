@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# .NET / C#
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Tests / cobertura (si aplica)
+TestResult*/ 
+coverage*/ 
+*.coverage
+*.trx
+
+# Lo que NO quieres subir según tu pedido
+2025*.txt
+manuscrito.md
+manuscrito_capitulos.md
+configurar_entorno.sh
