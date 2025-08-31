@@ -354,7 +354,7 @@ public class BookGenerator : IBookFlowOrchestrator
         var leaves = GetLeavesInOrder(_spec.TableOfContents);
         foreach (var leaf in leaves)
         {
-            if (_contentCalls >= _config.ContentCallsLimit)
+            if (_config.ContentCallsLimit > 0 && _contentCalls >= _config.ContentCallsLimit)
             {
                 _ui.WriteLine($"\n[Límite] Se alcanzó el máximo de {_config.ContentCallsLimit} llamadas a IA para contenido.", ConsoleColor.Yellow);
                 _logger.LogInformation("Límite de {Limit} llamadas de contenido alcanzado; deteniendo generación adicional", _config.ContentCallsLimit);

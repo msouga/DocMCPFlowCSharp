@@ -8,8 +8,8 @@ public class EnvironmentConfiguration : IConfiguration
     public string Model => Environment.GetEnvironmentVariable("OPENAI_MODEL")?.Trim() ?? "gpt-5-mini";
     public int MaxTokensPerCall => int.TryParse(Environment.GetEnvironmentVariable("OPENAI_MAX_COMPLETION_TOKENS"), out var mt) && mt > 0 ? mt : 4096;
     public int TargetWordsPerChapter
-        => int.TryParse(Environment.GetEnvironmentVariable("TARGET_WORDS_PER_CHAPTER"), out var tw) && tw > 0
-            ? tw
+        => int.TryParse(Environment.GetEnvironmentVariable("TARGET_WORDS_PER_CHAPTER"), out var tw)
+            ? tw // admite 0 o negativos para "ilimitado"
             : (DemoMode ? 900 : 6500);
     public int PrevChapterTailChars => 4000;
     public TimeSpan HttpTimeout => int.TryParse(Environment.GetEnvironmentVariable("OPENAI_HTTP_TIMEOUT_SECONDS"), out var ts) && ts > 0 ? TimeSpan.FromSeconds(ts) : TimeSpan.FromMinutes(5);

@@ -60,7 +60,7 @@ Contexto del Documento:
 
 Requisitos:
 - Escribe contenido técnico claro y preciso, adaptado al público.
-- El objetivo de extensión es de {targetWords} palabras.
+{targetWordsText}
 - La salida debe ser en formato Markdown.
 - Empieza directamente con el contenido, no repitas el título del capítulo.";
 
@@ -80,7 +80,7 @@ Contexto:
 {previousSiblingContent}
 
 Requisitos:
-- Extensión objetivo: {targetWords} palabras.
+{targetWordsText}
 - Estructura clara. No incluyas el encabezado principal del subcapítulo (se añadirá externamente).
 - Para subsecciones internas usa como máximo encabezados de cuarto nivel (####). No uses niveles 5 o 6.
 - No repitas el título; empieza directamente con el contenido.
@@ -117,6 +117,7 @@ Requisitos:
 
     public static string GetChapterPrompt(string title, string topic, string audience, string fullToc, ChapterNode node, string parentSummary, int targetWords)
     {
+        var targetWordsText = targetWords > 0 ? $"- El objetivo de extensión es de {targetWords} palabras." : "";
         return ChapterPromptTemplate
             .Replace("{chapterNumber}", node.Number)
             .Replace("{chapterTitle}", node.Title)
@@ -125,7 +126,7 @@ Requisitos:
             .Replace("{audience}", audience)
             .Replace("{summary}", node.Summary)
             .Replace("{parentSummary}", parentSummary)
-            .Replace("{targetWords}", targetWords.ToString());
+            .Replace("{targetWordsText}", targetWordsText);
     }
 
     public static string GetSubchapterContentPrompt(
@@ -151,6 +152,7 @@ Requisitos:
             prevSiblingContent = parentChapter.SubChapters[idx - 1].Content ?? string.Empty;
         }
 
+        var targetWordsText = targetWords > 0 ? $"- Extensión objetivo: {targetWords} palabras." : "";
         return SubchapterContentPromptTemplate
             .Replace("{sectionNumber}", subchapter.Number)
             .Replace("{sectionTitle}", subchapter.Title)
@@ -161,7 +163,7 @@ Requisitos:
             .Replace("{currentMainSummary}", string.IsNullOrWhiteSpace(parentChapter.Summary) ? "(ninguno)" : parentChapter.Summary)
             .Replace("{subchapterSummaries}", subSummaries.ToString())
             .Replace("{previousSiblingContent}", string.IsNullOrWhiteSpace(prevSiblingContent) ? "(sin contenido previo)" : prevSiblingContent)
-            .Replace("{targetWords}", targetWords.ToString());
+            .Replace("{targetWordsText}", targetWordsText);
     }
 
     public static object BuildPayload(string system, string user, string model, int maxTokens, string? jsonSchema = null)
