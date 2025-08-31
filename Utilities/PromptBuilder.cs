@@ -81,7 +81,8 @@ Contexto:
 
 Requisitos:
 - Extensión objetivo: {targetWords} palabras.
-- Estructura clara, con subtítulos si aplica.
+- Estructura clara. No incluyas el encabezado principal del subcapítulo (se añadirá externamente).
+- Para subsecciones internas usa como máximo encabezados de cuarto nivel (####). No uses niveles 5 o 6.
 - No repitas el título; empieza directamente con el contenido.
 - Mantén coherencia y continuidad con el contenido previo si existe.";
 
