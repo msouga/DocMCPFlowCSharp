@@ -35,6 +35,7 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
      export USE_RESPONSES_API=false           # opcional (true usa /v1/responses con caché de input)
      export CACHE_SYSTEM_INPUT=true           # opcional (cachea el system prompt)
      export CACHE_BOOK_CONTEXT=true           # opcional (cachea contexto del libro por corrida)
+     export RESPONSES_STRICT_JSON=false       # opcional (usa text.format para forzar JSON)
      ```
 
 3) Compilar y ejecutar:

@@ -12,6 +12,7 @@ public class OpenAiResponsesLlmClient : ILlmClient
     private readonly IUserInteraction _ui;
     private readonly ILogger<OpenAiResponsesLlmClient> _logger;
     private readonly HttpClient _http;
+    private bool _disableCacheControl;
 
     public OpenAiResponsesLlmClient(IConfiguration config, IUserInteraction ui, ILogger<OpenAiResponsesLlmClient> logger)
     {
@@ -34,7 +35,7 @@ public class OpenAiResponsesLlmClient : ILlmClient
             // 1) System (cacheable opcional)
             var systemContent = new JsonArray
             {
-                BuildInputText(system, cacheable: _config.CacheSystemInput)
+                BuildInputText(system, cacheable: _config.CacheSystemInput && !_disableCacheControl)
             };
             inputArray.Add(new JsonObject
             {
@@ -47,7 +48,7 @@ public class OpenAiResponsesLlmClient : ILlmClient
             {
                 var ctxContent = new JsonArray
                 {
-                    BuildInputText(RunContext.BookContextStable!, cacheable: true)
+                    BuildInputText(RunContext.BookContextStable!, cacheable: !_disableCacheControl)
                 };
                 inputArray.Add(new JsonObject
                 {
@@ -74,28 +75,39 @@ public class OpenAiResponsesLlmClient : ILlmClient
                 ["max_output_tokens"] = maxTokens
             };
 
-            if (!string.IsNullOrEmpty(jsonSchema))
+            if (_config.ResponsesStrictJson && !string.IsNullOrWhiteSpace(jsonSchema))
             {
-                try
+                var trimmed = jsonSchema.Trim();
+                var textObj = new JsonObject();
+                if (trimmed == "{{}}" || trimmed == "{}")
                 {
-                    var schemaElement = JsonNode.Parse(jsonSchema) as JsonNode;
-                    if (schemaElement != null)
+                    textObj["format"] = "json_object";
+                }
+                else
+                {
+                    try
                     {
-                        root["response_format"] = new JsonObject
+                        var schemaElement = JsonNode.Parse(jsonSchema) as JsonNode;
+                        if (schemaElement != null)
                         {
-                            ["type"] = "json_schema",
-                            ["json_schema"] = new JsonObject
+                            textObj["format"] = "json_schema";
+                            textObj["json_schema"] = new JsonObject
                             {
                                 ["name"] = "schema",
                                 ["schema"] = schemaElement
-                            }
-                        };
+                            };
+                        }
+                        else
+                        {
+                            textObj["format"] = "json_object";
+                        }
+                    }
+                    catch
+                    {
+                        textObj["format"] = "json_object";
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "No se pudo parsear jsonSchema; enviando sin response_format");
-                }
+                root["text"] = textObj;
             }
 
             var payload = root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
@@ -106,8 +118,61 @@ public class OpenAiResponsesLlmClient : ILlmClient
             var body = await resp.Content.ReadAsStringAsync();
             if (!resp.IsSuccessStatusCode)
             {
-                _logger.LogError("Responses API error: {Status} {Body}", resp.StatusCode, body);
-                return string.Empty;
+                // Fallback: si el servidor no acepta cache_control, reintentar sin esos campos
+                if ((int)resp.StatusCode == 400 && body.Contains("cache_control", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("Responses API rechazó cache_control; reintentando sin caché de input y deshabilitando cache_control para esta sesión");
+                    _disableCacheControl = true;
+                    var inputNoCache = new JsonArray();
+                    inputNoCache.Add(new JsonObject
+                    {
+                        ["role"] = "system",
+                        ["content"] = new JsonArray { BuildInputText(system, cacheable: false) }
+                    });
+                    if (!string.IsNullOrWhiteSpace(RunContext.BookContextStable))
+                    {
+                        inputNoCache.Add(new JsonObject
+                        {
+                            ["role"] = "system",
+                            ["content"] = new JsonArray { BuildInputText(RunContext.BookContextStable!, cacheable: false) }
+                        });
+                    }
+                    inputNoCache.Add(new JsonObject
+                    {
+                        ["role"] = "user",
+                        ["content"] = new JsonArray { BuildInputText(user, cacheable: false) }
+                    });
+                    root["input"] = inputNoCache;
+                    var payload2 = root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+                    var resp2 = await _http.PostAsync("https://api.openai.com/v1/responses", new StringContent(payload2, Encoding.UTF8, "application/json"));
+                    var body2 = await resp2.Content.ReadAsStringAsync();
+                    if (!resp2.IsSuccessStatusCode)
+                    {
+                        _logger.LogError("Responses API error (retry): {Status} {Body}", resp2.StatusCode, body2);
+                        return string.Empty;
+                    }
+                    body = body2;
+                }
+                else if ((int)resp.StatusCode == 400 && body.Contains("response_format", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Si llega aquí por una versión intermedia, rehacer sin root["text"]
+                    _logger.LogInformation("Responses API rechazó response_format/text.format; reintentando sin formato JSON estricto");
+                    root.Remove("text");
+                    var payload3 = root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+                    var resp3 = await _http.PostAsync("https://api.openai.com/v1/responses", new StringContent(payload3, Encoding.UTF8, "application/json"));
+                    var body3 = await resp3.Content.ReadAsStringAsync();
+                    if (!resp3.IsSuccessStatusCode)
+                    {
+                        _logger.LogError("Responses API error (retry-2): {Status} {Body}", resp3.StatusCode, body3);
+                        return string.Empty;
+                    }
+                    body = body3;
+                }
+                else
+                {
+                    _logger.LogError("Responses API error: {Status} {Body}", resp.StatusCode, body);
+                    return string.Empty;
+                }
             }
 
             // La estructura de salida de Responses incluye 'output' con items; tomar el primer textual.
@@ -166,4 +231,3 @@ public class OpenAiResponsesLlmClient : ILlmClient
         _ui.WriteLine("[Uso de Tokens — Responses API: no disponible]", ConsoleColor.DarkGray);
     }
 }
-

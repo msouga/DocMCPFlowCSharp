@@ -1,0 +1,87 @@
+﻿[2025-08-31T08:17:07.6692340-05:00] [Information] Program: Inicio de sesión — 2025-08-31T08:17:07.6662740-05:00
+[2025-08-31T08:17:07.6755850-05:00] [Information] Program: Arrancando orquestador de flujo (BookGenerator.RunAsync)
+[2025-08-31T08:17:07.6790630-05:00] [Information] BookGenerator: Entradas iniciales — Título: 'Docker para Programadores', Público: 'programadores de C#', Tema: 'Docker en Azure como se puede usar'
+[2025-08-31T08:17:07.6798410-05:00] [Information] BookGenerator: DemoMode: TOC demo 2x2 construido
+[2025-08-31T08:17:07.6814560-05:00] [Information] BookGenerator: Índice finalizado por el usuario
+[2025-08-31T08:17:07.6817050-05:00] [Information] BookGenerator: BookContextStable preparado (len=286)
+[2025-08-31T08:17:07.6865950-05:00] [Information] OpenAiResponsesLlmClient: Responses request → model=gpt-5-mini, maxTokens=14096, userPreview="Basado en la siguiente estructura de un documento técnico, escribe un solo párrafo de introducción (entre 100 y 200 pala…"
+[2025-08-31T08:17:08.5334270-05:00] [Information] OpenAiResponsesLlmClient: Responses API rechazó cache_control; reintentando sin caché de input y deshabilitando cache_control para esta sesión
+[2025-08-31T08:17:18.0692880-05:00] [Information] OpenAiResponsesLlmClient: Responses response ← len=967
+[2025-08-31T08:17:18.0707240-05:00] [Information] BookGenerator: Introducción generada (len=967)
+[2025-08-31T08:17:18.0735840-05:00] [Information] BookGenerator: LLM Summaries prompt para capítulo 1: 'Conceptos básicos'
+[2025-08-31T08:17:18.0740060-05:00] [Information] OpenAiResponsesLlmClient: Responses request → model=gpt-5-mini, maxTokens=14096, userPreview="Para el siguiente capítulo principal y su lista de subcapítulos, genera un resumen para cada uno.  Contexto General: - T…"
+[2025-08-31T08:17:18.2499440-05:00] [Error] OpenAiResponsesLlmClient: Responses API error: BadRequest {
+  "error": {
+    "message": "Invalid type for 'text.format': expected a text format, but got a string instead.",
+    "type": "invalid_request_error",
+    "param": "text.format",
+    "code": "invalid_type"
+  }
+}
+[2025-08-31T08:17:18.2687610-05:00] [Error] BookGenerator: Error al parsear resúmenes capítulo 1: The input does not contain any JSON tokens. Expected the input to start with a valid JSON token, when isFinalBlock is true. LineNumber: 0 | BytePositionInLine: 0. | EX: System.Text.Json.JsonReaderException: The input does not contain any JSON tokens. Expected the input to start with a valid JSON token, when isFinalBlock is true. LineNumber: 0 | BytePositionInLine: 0.
+   at System.Text.Json.ThrowHelper.ThrowJsonReaderException(Utf8JsonReader& json, ExceptionResource resource, Byte nextByte, ReadOnlySpan`1 bytes)
+   at System.Text.Json.Utf8JsonReader.Read()
+   at System.Text.Json.JsonDocument.Parse(ReadOnlySpan`1 utf8JsonSpan, JsonReaderOptions readerOptions, MetadataDb& database, StackRowStack& stack)
+   at System.Text.Json.JsonDocument.Parse(ReadOnlyMemory`1 utf8Json, JsonReaderOptions readerOptions, Byte[] extraRentedArrayPoolBytes, PooledByteBufferWriter extraPooledByteBufferWriter)
+   at System.Text.Json.JsonDocument.Parse(ReadOnlyMemory`1 json, JsonDocumentOptions options)
+   at BookGenerator.GenerateSummaries() in /Users/msouga/code/BookGen2/DocMCPFlowCSharp/Orchestration/BookGenerator.cs:line 278
+[2025-08-31T08:17:18.2693190-05:00] [Information] BookGenerator: LLM Summaries prompt para capítulo 2: 'Aplicación práctica'
+[2025-08-31T08:17:18.2695930-05:00] [Information] OpenAiResponsesLlmClient: Responses request → model=gpt-5-mini, maxTokens=14096, userPreview="Para el siguiente capítulo principal y su lista de subcapítulos, genera un resumen para cada uno.  Contexto General: - T…"
+[2025-08-31T08:17:18.6743620-05:00] [Error] OpenAiResponsesLlmClient: Responses API error: BadRequest {
+  "error": {
+    "message": "Invalid type for 'text.format': expected a text format, but got a string instead.",
+    "type": "invalid_request_error",
+    "param": "text.format",
+    "code": "invalid_type"
+  }
+}
+[2025-08-31T08:17:18.6763910-05:00] [Error] BookGenerator: Error al parsear resúmenes capítulo 2: The input does not contain any JSON tokens. Expected the input to start with a valid JSON token, when isFinalBlock is true. LineNumber: 0 | BytePositionInLine: 0. | EX: System.Text.Json.JsonReaderException: The input does not contain any JSON tokens. Expected the input to start with a valid JSON token, when isFinalBlock is true. LineNumber: 0 | BytePositionInLine: 0.
+   at System.Text.Json.ThrowHelper.ThrowJsonReaderException(Utf8JsonReader& json, ExceptionResource resource, Byte nextByte, ReadOnlySpan`1 bytes)
+   at System.Text.Json.Utf8JsonReader.Read()
+   at System.Text.Json.JsonDocument.Parse(ReadOnlySpan`1 utf8JsonSpan, JsonReaderOptions readerOptions, MetadataDb& database, StackRowStack& stack)
+   at System.Text.Json.JsonDocument.Parse(ReadOnlyMemory`1 utf8Json, JsonReaderOptions readerOptions, Byte[] extraRentedArrayPoolBytes, PooledByteBufferWriter extraPooledByteBufferWriter)
+   at System.Text.Json.JsonDocument.Parse(ReadOnlyMemory`1 json, JsonDocumentOptions options)
+   at BookGenerator.GenerateSummaries() in /Users/msouga/code/BookGen2/DocMCPFlowCSharp/Orchestration/BookGenerator.cs:line 278
+[2025-08-31T08:17:18.6846470-05:00] [Information] MarkdownManuscriptWriter: Archivo manuscrito.md actualizado
+[2025-08-31T08:17:18.6853450-05:00] [Information] MarkdownManuscriptWriter: Copia en back: back/2025-08-31-08-17-07/manuscrito.md
+[2025-08-31T08:17:18.6855470-05:00] [Information] BookGenerator: Guardado de manuscrito luego de resúmenes
+[2025-08-31T08:17:18.6859000-05:00] [Information] BookGenerator: Límite de llamadas de contenido: 8
+[2025-08-31T08:17:18.6881690-05:00] [Information] BookGenerator: LLM Content prompt para subcapítulo 1.1: 'Introducción'
+[2025-08-31T08:17:18.6893490-05:00] [Information] OpenAiResponsesLlmClient: Responses request → model=gpt-5-mini, maxTokens=14096, userPreview="Redacta el contenido del subcapítulo **1.1 — Introducción** en español y formato Markdown.  Contexto: - Título del Docum…"
+[2025-08-31T08:17:38.9667130-05:00] [Information] OpenAiResponsesLlmClient: Responses response ← len=4672
+[2025-08-31T08:17:38.9696130-05:00] [Information] BookGenerator: Contenido recibido subcapítulo 1.1 (len=4672) – guardando
+[2025-08-31T08:17:38.9822580-05:00] [Information] MarkdownManuscriptWriter: Archivo manuscrito.md actualizado
+[2025-08-31T08:17:38.9827290-05:00] [Information] MarkdownManuscriptWriter: Copia en back: back/2025-08-31-08-17-07/manuscrito.md
+[2025-08-31T08:17:38.9829480-05:00] [Information] BookGenerator: LLM Content prompt para subcapítulo 1.2: 'Primeros pasos'
+[2025-08-31T08:17:38.9832960-05:00] [Information] OpenAiResponsesLlmClient: Responses request → model=gpt-5-mini, maxTokens=14096, userPreview="Redacta el contenido del subcapítulo **1.2 — Primeros pasos** en español y formato Markdown.  Contexto: - Título del Doc…"
+[2025-08-31T08:17:46.5403970-05:00] [Information] OpenAiResponsesLlmClient: Responses response ← len=7662
+[2025-08-31T08:17:46.5426700-05:00] [Information] BookGenerator: Contenido recibido subcapítulo 2.3 (len=7662) – guardando
+[2025-08-31T08:17:46.5476150-05:00] [Information] MarkdownManuscriptWriter: Archivo manuscrito.md actualizado
+[2025-08-31T08:17:46.5495500-05:00] [Information] MarkdownManuscriptWriter: Copia en back: back/2025-08-31-08-05-44/manuscrito.md
+[2025-08-31T08:17:46.5499110-05:00] [Information] BookGenerator: LLM Content prompt para subcapítulo 2.4: 'Rendimiento y limitaciones comunes en contenedores'
+[2025-08-31T08:17:46.5504090-05:00] [Information] OpenAiResponsesLlmClient: Responses request → model=gpt-5-mini, maxTokens=14096, userPreview="Redacta el contenido del subcapítulo **2.4 — Rendimiento y limitaciones comunes en contenedores** en español y formato M…"
+[2025-08-31T08:17:46.7786840-05:00] [Warning] OpenAiResponsesLlmClient: Responses API rechazó cache_control; reintentando sin caché de input
+[2025-08-31T08:18:05.1996860-05:00] [Information] OpenAiResponsesLlmClient: Responses response ← len=5604
+[2025-08-31T08:18:05.2010590-05:00] [Information] BookGenerator: Contenido recibido subcapítulo 1.2 (len=5604) – guardando
+[2025-08-31T08:18:05.2046450-05:00] [Information] MarkdownManuscriptWriter: Archivo manuscrito.md actualizado
+[2025-08-31T08:18:05.2054890-05:00] [Information] MarkdownManuscriptWriter: Copia en back: back/2025-08-31-08-17-07/manuscrito.md
+[2025-08-31T08:18:05.2057660-05:00] [Information] BookGenerator: LLM Content prompt para subcapítulo 2.1: 'Ejemplo guiado'
+[2025-08-31T08:18:05.2061720-05:00] [Information] OpenAiResponsesLlmClient: Responses request → model=gpt-5-mini, maxTokens=14096, userPreview="Redacta el contenido del subcapítulo **2.1 — Ejemplo guiado** en español y formato Markdown.  Contexto: - Título del Doc…"
+[2025-08-31T08:18:29.3398720-05:00] [Information] OpenAiResponsesLlmClient: Responses response ← len=8762
+[2025-08-31T08:18:29.3423820-05:00] [Information] BookGenerator: Contenido recibido subcapítulo 2.4 (len=8762) – guardando
+[2025-08-31T08:18:29.3493550-05:00] [Information] MarkdownManuscriptWriter: Archivo manuscrito.md actualizado
+[2025-08-31T08:18:29.3591040-05:00] [Information] MarkdownManuscriptWriter: Copia en back: back/2025-08-31-08-05-44/manuscrito.md
+[2025-08-31T08:18:29.3598940-05:00] [Information] BookGenerator: Límite de 8 llamadas de contenido alcanzado; deteniendo generación adicional
+[2025-08-31T08:18:29.3617430-05:00] [Information] MarkdownManuscriptWriter: Archivo manuscrito.md actualizado
+[2025-08-31T08:18:29.3624850-05:00] [Information] MarkdownManuscriptWriter: Copia en back: back/2025-08-31-08-05-44/manuscrito.md
+[2025-08-31T08:18:29.3638410-05:00] [Information] MarkdownManuscriptWriter: Archivo manuscrito_capitulos.md actualizado (final)
+[2025-08-31T08:18:29.3647520-05:00] [Information] MarkdownManuscriptWriter: Copia en back: back/2025-08-31-08-05-44/manuscrito_capitulos.md
+[2025-08-31T08:18:29.3649870-05:00] [Information] BookGenerator: Guardado final de manuscrito (contenido completo)
+[2025-08-31T08:18:29.3654480-05:00] [Information] Program: Ejecución de orquestador completada
+[2025-08-31T08:18:29.3680990-05:00] [Information] Program: Tiempo total: 00:12:44.4778229
+[2025-08-31T08:18:31.2456900-05:00] [Information] OpenAiResponsesLlmClient: Responses response ← len=5608
+[2025-08-31T08:18:31.2476010-05:00] [Information] BookGenerator: Contenido recibido subcapítulo 2.1 (len=5608) – guardando
+[2025-08-31T08:18:31.2521690-05:00] [Information] MarkdownManuscriptWriter: Archivo manuscrito.md actualizado
+[2025-08-31T08:18:31.2534020-05:00] [Information] MarkdownManuscriptWriter: Copia en back: back/2025-08-31-08-17-07/manuscrito.md
+[2025-08-31T08:18:31.2539730-05:00] [Information] BookGenerator: LLM Content prompt para subcapítulo 2.2: 'Buenas prácticas'
+[2025-08-31T08:18:31.2549750-05:00] [Information] OpenAiResponsesLlmClient: Responses request → model=gpt-5-mini, maxTokens=14096, userPreview="Redacta el contenido del subcapítulo **2.2 — Buenas prácticas** en español y formato Markdown.  Contexto: - Título del D…"

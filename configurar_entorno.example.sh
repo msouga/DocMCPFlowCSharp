@@ -48,6 +48,7 @@ export DEBUG="${DEBUG:-true}"
 export USE_RESPONSES_API="${USE_RESPONSES_API:-false}"
 export CACHE_SYSTEM_INPUT="${CACHE_SYSTEM_INPUT:-true}"
 export CACHE_BOOK_CONTEXT="${CACHE_BOOK_CONTEXT:-true}"
+export RESPONSES_STRICT_JSON="${RESPONSES_STRICT_JSON:-false}"
 
 echo "✅ Plantilla de variables de entorno cargada (sin credenciales)."
 echo "ℹ️ Copia a configurar_entorno.sh y añade tu clave real."

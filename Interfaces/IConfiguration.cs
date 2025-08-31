@@ -17,4 +17,5 @@ public interface IConfiguration
     bool UseResponsesApi { get; }
     bool CacheSystemInput { get; }
     bool CacheBookContext { get; }
+    bool ResponsesStrictJson { get; }
 }
