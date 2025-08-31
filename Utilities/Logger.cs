@@ -6,12 +6,23 @@ public static class Logger
 {
     private static readonly object _sync = new();
     private static string? _path;
+    public static string? RunDirectory { get; private set; }
 
     public static void Init(string path)
     {
         lock (_sync)
         {
             _path = path;
+            try
+            {
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                    RunDirectory = dir;
+                }
+            }
+            catch { /* best-effort */ }
         }
     }
 
@@ -44,4 +55,3 @@ public static class Logger
         }
     }
 }
-

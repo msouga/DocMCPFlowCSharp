@@ -58,9 +58,9 @@ Estas opciones se leen en `Implementations/EnvironmentConfiguration.cs` y en `Pr
 Al ejecutar, el programa:
 
 1) Verifica `OPENAI_API_KEY`. Si falta, muestra un aviso y termina.
-2) Crea un archivo de log con timestamp en la raíz (por ejemplo `2025-08-29-19-00-30-log.txt`).
+2) Crea un directorio de corrida bajo `back/AAAA-MM-DD-HH-mm-ss/` y guarda el log allí.
 3) Inicializa el cliente OpenAI (`Implementations/OpenAiSdkLlmClient.cs`).
-4) Orquesta la generación con `Orchestration/BookGenerator.cs` y escribe el manuscrito (`Implementations/MarkdownManuscriptWriter.cs`).
+4) Orquesta la generación con `Orchestration/BookGenerator.cs` y escribe el manuscrito (`Implementations/MarkdownManuscriptWriter.cs`). También deja copias de `manuscrito.md` y `manuscrito_capitulos.md` en ese directorio de `back/`.
 
 ## Estructura del proyecto (resumen)
 

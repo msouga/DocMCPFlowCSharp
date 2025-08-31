@@ -42,6 +42,16 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
 
         await System.IO.File.WriteAllTextAsync("manuscrito.md", fullManuscript.ToString(), Encoding.UTF8);
         Logger.Append("Archivo manuscrito.md actualizado");
+        try
+        {
+            if (!string.IsNullOrEmpty(Logger.RunDirectory))
+            {
+                var backPath = System.IO.Path.Combine(Logger.RunDirectory, "manuscrito.md");
+                await System.IO.File.WriteAllTextAsync(backPath, fullManuscript.ToString(), Encoding.UTF8);
+                Logger.Append($"Copia en back: {backPath}");
+            }
+        }
+        catch { /* no interrumpir el flujo por copia fallida */ }
 
         if (final)
         {
@@ -52,6 +62,16 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: true);
             await System.IO.File.WriteAllTextAsync("manuscrito_capitulos.md", onlyChapters.ToString(), Encoding.UTF8);
             Logger.Append("Archivo manuscrito_capitulos.md actualizado (final)");
+            try
+            {
+                if (!string.IsNullOrEmpty(Logger.RunDirectory))
+                {
+                    var backPath2 = System.IO.Path.Combine(Logger.RunDirectory, "manuscrito_capitulos.md");
+                    await System.IO.File.WriteAllTextAsync(backPath2, onlyChapters.ToString(), Encoding.UTF8);
+                    Logger.Append($"Copia en back: {backPath2}");
+                }
+            }
+            catch { }
         }
     }
 

@@ -15,9 +15,12 @@ internal class Program
             return;
         }
 
-        var logFilePath = $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss}-log.txt";
+        var runId = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss");
+        var runDir = System.IO.Path.Combine("back", runId);
+        var logFilePath = System.IO.Path.Combine(runDir, $"{runId}-log.txt");
         try
         {
+            System.IO.Directory.CreateDirectory(runDir);
             await System.IO.File.WriteAllTextAsync(logFilePath, $"# Log de sesión — {DateTime.Now:O}\n\n");
             Logger.Init(logFilePath);
             Logger.Append("Inicio de sesión y preparación de entorno");
