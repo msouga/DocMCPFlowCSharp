@@ -127,6 +127,8 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             var content = node.Content ?? string.Empty;
             // Sanitizar encabezados internos para no superar nivel #### y evitar duplicar el H3 del subcapítulo
             content = SanitizeInternalHeadings(content, node.Number, node.Title);
+            // Asegurar separación entre líneas que terminan en ':' y la siguiente que inicia con backticks
+            content = FixColonBacktickSpacing(content);
             sb.AppendLine(content);
             sb.AppendLine();
 
@@ -172,5 +174,19 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         }
 
         return result.ToString().TrimEnd('\n');
+    }
+
+    private static string FixColonBacktickSpacing(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return content;
+        // Normaliza saltos, inserta una línea en blanco entre ':' de fin de línea y una nueva línea que arranca con ` o ```
+        var text = content.Replace("\r\n", "\n");
+        text = System.Text.RegularExpressions.Regex.Replace(
+            text,
+            @":\n(\s*)(`{1,3})",
+            ":\n\n$1$2",
+            System.Text.RegularExpressions.RegexOptions.Multiline
+        );
+        return text.Replace("\n", System.Environment.NewLine);
     }
 }
