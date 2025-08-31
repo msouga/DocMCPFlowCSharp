@@ -12,4 +12,5 @@ public interface IConfiguration
     TimeSpan HttpTimeout { get; }
     bool TreatRefusalAsError { get; }
     bool DemoMode { get; }
+    int ContentCallsLimit { get; }
 }

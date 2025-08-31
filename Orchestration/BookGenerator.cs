@@ -46,6 +46,7 @@ public class BookGenerator : IBookFlowOrchestrator
         }
 
         _ui.WriteLine("\n[Proceso] Generando contenido completo del documento...", ConsoleColor.Green);
+        Logger.Append($"Límite de llamadas de contenido: {_config.ContentCallsLimit}");
         await GenerateContentForLeaves();
         await _writer.SaveAsync(_spec, final: true);
         Logger.Append("Guardado final de manuscrito (contenido completo)");
@@ -103,20 +104,20 @@ public class BookGenerator : IBookFlowOrchestrator
         {
             new ChapterNode
             {
-                Title = "Capítulo 1: Conceptos básicos",
+                Title = "Conceptos básicos",
                 SubChapters =
                 {
-                    new ChapterNode{ Title = "1.1 Introducción" },
-                    new ChapterNode{ Title = "1.2 Primeros pasos" }
+                    new ChapterNode{ Title = "Introducción" },
+                    new ChapterNode{ Title = "Primeros pasos" }
                 }
             },
             new ChapterNode
             {
-                Title = "Capítulo 2: Aplicación práctica",
+                Title = "Aplicación práctica",
                 SubChapters =
                 {
-                    new ChapterNode{ Title = "2.1 Ejemplo guiado" },
-                    new ChapterNode{ Title = "2.2 Buenas prácticas" }
+                    new ChapterNode{ Title = "Ejemplo guiado" },
+                    new ChapterNode{ Title = "Buenas prácticas" }
                 }
             }
         };
@@ -335,10 +336,10 @@ public class BookGenerator : IBookFlowOrchestrator
         var leaves = GetLeavesInOrder(_spec.TableOfContents);
         foreach (var leaf in leaves)
         {
-            if (_contentCalls >= 8)
+            if (_contentCalls >= _config.ContentCallsLimit)
             {
-                _ui.WriteLine("\n[Límite] Se alcanzó el máximo de 8 llamadas a IA para contenido.", ConsoleColor.Yellow);
-                Logger.Append("Límite de 8 llamadas de contenido alcanzado; deteniendo generación adicional");
+                _ui.WriteLine($"\n[Límite] Se alcanzó el máximo de {_config.ContentCallsLimit} llamadas a IA para contenido.", ConsoleColor.Yellow);
+                Logger.Append($"Límite de {_config.ContentCallsLimit} llamadas de contenido alcanzado; deteniendo generación adicional");
                 break;
             }
 

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 public class MarkdownManuscriptWriter : IManuscriptWriter
 {
@@ -45,7 +46,10 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         if (final)
         {
             var onlyChapters = new StringBuilder();
-            AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: false);
+            // Título del libro
+            onlyChapters.AppendLine($"# {spec.Title}");
+            onlyChapters.AppendLine();
+            AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: true);
             await System.IO.File.WriteAllTextAsync("manuscrito_capitulos.md", onlyChapters.ToString(), Encoding.UTF8);
             Logger.Append("Archivo manuscrito_capitulos.md actualizado (final)");
         }
@@ -82,7 +86,10 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
 
     private void AppendContent(StringBuilder sb, List<ChapterNode> nodes, int level, bool includeHeaders = true)
     {
-        var headerPrefix = new string('#', level + 1);
+        // Niveles: 1 => ## Capítulo, 2 => ### Subcapítulo, 3 => #### Sub-sub.
+        // Capar en 4 (# título global se escribe aparte)
+        var headerLevel = Math.Min(level + 1, 4);
+        var headerPrefix = new string('#', headerLevel);
         foreach (var node in nodes)
         {
             if (includeHeaders)
@@ -90,7 +97,10 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 sb.AppendLine($"{headerPrefix} {node.Number} {node.Title}");
                 sb.AppendLine();
             }
-            sb.AppendLine(node.Content);
+            var content = node.Content ?? string.Empty;
+            // Sanitizar encabezados internos para no superar nivel #### y evitar duplicar el H3 del subcapítulo
+            content = SanitizeInternalHeadings(content, node.Number, node.Title);
+            sb.AppendLine(content);
             sb.AppendLine();
 
             if (node.SubChapters.Any())
@@ -98,5 +108,42 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 AppendContent(sb, node.SubChapters, level + 1, includeHeaders);
             }
         }
+    }
+
+    private static string SanitizeInternalHeadings(string content, string number, string title)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var headerPattern = new Regex($@"^\s*#+\s+{Regex.Escape(number)}\s+{Regex.Escape(title)}\s*$", RegexOptions.Compiled);
+
+        var result = new StringBuilder(content.Length + 64);
+        bool firstLineProcessed = false;
+        foreach (var raw in lines)
+        {
+            var line = raw;
+            if (!firstLineProcessed)
+            {
+                // Si la primera línea repite el encabezado del subcapítulo, eliminarla
+                if (Regex.IsMatch(line, $@"^\s*#+\s+{Regex.Escape(number)}\s+{Regex.Escape(title)}\s*$"))
+                {
+                    firstLineProcessed = true;
+                    continue;
+                }
+                firstLineProcessed = true;
+            }
+
+            // Normalizar cualquier encabezado a como máximo nivel 4 (####)
+            if (Regex.IsMatch(line, @"^\s*#{1,6}\s+"))
+            {
+                // Capturar el texto del encabezado y reescribir con ####
+                var text = Regex.Replace(line, @"^\s*#{1,6}\s+", "").TrimEnd();
+                line = $"#### {text}";
+            }
+
+            result.AppendLine(line);
+        }
+
+        return result.ToString().TrimEnd('\n');
     }
 }

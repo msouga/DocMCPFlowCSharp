@@ -30,6 +30,7 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
      export SHOW_USAGE=true                   # opcional
      export TREAT_REFUSAL_AS_ERROR=true       # opcional
      export DEMO_MODE=true                    # opcional (índice 2×2 por defecto)
+     export CONTENT_CALLS_LIMIT=8             # opcional (máx. llamadas de contenido)
      ```
 
 3) Compilar y ejecutar:
@@ -48,6 +49,7 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
 - `SHOW_USAGE`: si `true`, muestra uso de tokens al finalizar (no disponible con la lib actual; se avisa). Defecto: `true`.
 - `TREAT_REFUSAL_AS_ERROR`: si `true`, trata una negativa del modelo como error fatal. Defecto: `true`.
 - `DEMO_MODE`: si `true`, limita el índice a 2 capítulos con 2 subcapítulos cada uno para pruebas. Defecto: `true`.
+- `CONTENT_CALLS_LIMIT`: número máximo de llamadas a IA para generar contenido de subcapítulos. Defecto: `8`.
 
 Estas opciones se leen en `Implementations/EnvironmentConfiguration.cs` y en `Program.cs`.
 
