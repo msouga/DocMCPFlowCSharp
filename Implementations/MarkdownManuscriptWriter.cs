@@ -179,12 +179,13 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
     private static string FixColonBacktickSpacing(string content)
     {
         if (string.IsNullOrEmpty(content)) return content;
-        // Normaliza saltos, inserta una línea en blanco entre ':' de fin de línea y una nueva línea que arranca con ` o ```
+        // Regla general: siempre asegurar dos saltos de línea después de una línea que termina en ':'
+        // Si ya hay dos saltos, no hace nada; si hay uno, inserta uno extra.
         var text = content.Replace("\r\n", "\n");
         text = System.Text.RegularExpressions.Regex.Replace(
             text,
-            @":\n(\s*)(`{1,3})",
-            ":\n\n$1$2",
+            @":\n(?!\n)",
+            ":\n\n",
             System.Text.RegularExpressions.RegexOptions.Multiline
         );
         return text.Replace("\n", System.Environment.NewLine);
