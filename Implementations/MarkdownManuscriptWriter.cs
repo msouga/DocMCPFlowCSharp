@@ -58,7 +58,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 _logger.LogInformation("Copia en back: {Path}", backPath);
             }
         }
-        catch { /* no interrumpir el flujo por copia fallida */ }
+        catch (Exception ex) { _logger.LogWarning(ex, "No se pudo copiar manuscrito.md al directorio back"); }
 
         if (final)
         {
@@ -78,7 +78,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                     _logger.LogInformation("Copia en back: {Path}", backPath2);
                 }
             }
-            catch { }
+            catch (Exception ex) { _logger.LogWarning(ex, "No se pudo copiar manuscrito_capitulos.md al directorio back"); }
         }
     }
 

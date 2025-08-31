@@ -60,6 +60,41 @@ internal class Program
                 log.LogInformation($"Tiempo total: {flowSw.Elapsed}");
             }
         }
-        catch { /* si no se puede escribir, seguimos sin romper */ }
+        catch (Exception ex)
+        {
+            // Fallback: si falla la inicialización del logger/archivos, seguimos con consola solamente
+            ui.WriteLine("[Aviso] No se pudo inicializar el logging en archivos. Continuando solo con consola.", ConsoleColor.Yellow);
+            ui.WriteLine(ex.Message, ConsoleColor.DarkYellow);
+
+            using var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
+            {
+                builder.AddConsole();
+            });
+            var log = loggerFactory.CreateLogger<Program>();
+            var llmClient = new OpenAiSdkLlmClient(config, ui, loggerFactory.CreateLogger<OpenAiSdkLlmClient>());
+            var manuscriptWriter = new MarkdownManuscriptWriter(loggerFactory.CreateLogger<MarkdownManuscriptWriter>());
+            var orchestrator = new BookGenerator(config, ui, llmClient, manuscriptWriter, loggerFactory.CreateLogger<BookGenerator>());
+
+            var flowSw = Stopwatch.StartNew();
+            try
+            {
+                log.LogInformation("Arrancando orquestador de flujo (BookGenerator.RunAsync) [fallback]");
+                await orchestrator.RunAsync();
+                log.LogInformation("Ejecución de orquestador completada [fallback]");
+            }
+            catch (Exception ex2)
+            {
+                ui.WriteLine($"\n[ERROR FATAL] {ex2.Message}", ConsoleColor.Red);
+                ui.WriteLine(ex2.ToString(), ConsoleColor.DarkRed);
+                log.LogError(ex2, "ERROR FATAL en ejecución [fallback]");
+            }
+            finally
+            {
+                flowSw.Stop();
+                llmClient.PrintUsage();
+                ui.WriteLine($"Tiempo total: {flowSw.Elapsed}", ConsoleColor.Magenta);
+                log.LogInformation($"Tiempo total: {flowSw.Elapsed}");
+            }
+        }
     }
 }
