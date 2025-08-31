@@ -64,7 +64,6 @@ public class BookGenerator : IBookFlowOrchestrator
         }
 
         _ui.WriteLine("\n[Proceso] Generando contenido completo del documento...", ConsoleColor.Green);
-        _logger.LogInformation("Límite de llamadas de contenido: {Limit}", _config.ContentCallsLimit);
         await GenerateContentForLeaves();
         await _writer.SaveAsync(_spec, final: true);
         _logger.LogInformation("Guardado final de manuscrito (contenido completo)");
@@ -347,20 +346,11 @@ public class BookGenerator : IBookFlowOrchestrator
         }
     }
 
-    private int _contentCalls;
     private async Task GenerateContentForLeaves()
     {
-        _contentCalls = 0;
         var leaves = GetLeavesInOrder(_spec.TableOfContents);
         foreach (var leaf in leaves)
         {
-            if (_config.ContentCallsLimit > 0 && _contentCalls >= _config.ContentCallsLimit)
-            {
-                _ui.WriteLine($"\n[Límite] Se alcanzó el máximo de {_config.ContentCallsLimit} llamadas a IA para contenido.", ConsoleColor.Yellow);
-                _logger.LogInformation("Límite de {Limit} llamadas de contenido alcanzado; deteniendo generación adicional", _config.ContentCallsLimit);
-                break;
-            }
-
             var (_, parent) = FindNode(_spec.TableOfContents, leaf.Number);
             if (parent == null)
                 continue;
@@ -389,7 +379,6 @@ public class BookGenerator : IBookFlowOrchestrator
                 _config.TargetWordsPerChapter);
 
             leaf.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
-            _contentCalls++;
             _logger.LogInformation("Contenido recibido subcapítulo {Number} (len={Len}) – guardando", leaf.Number, leaf.Content?.Length ?? 0);
             await _writer.SaveAsync(_spec);
         }

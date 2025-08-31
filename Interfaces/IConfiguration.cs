@@ -12,10 +12,10 @@ public interface IConfiguration
     TimeSpan HttpTimeout { get; }
     bool TreatRefusalAsError { get; }
     bool DemoMode { get; }
-    int ContentCallsLimit { get; }
     bool DebugLogging { get; }
     bool UseResponsesApi { get; }
     bool CacheSystemInput { get; }
     bool CacheBookContext { get; }
     bool ResponsesStrictJson { get; }
+    string? OpenAiBetaHeader { get; }
 }

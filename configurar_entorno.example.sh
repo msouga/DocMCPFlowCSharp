@@ -39,7 +39,6 @@ export TREAT_REFUSAL_AS_ERROR="${TREAT_REFUSAL_AS_ERROR:-true}"
 export DEMO_MODE="${DEMO_MODE:-true}"
 
 # Límite de llamadas a IA para generar contenido (por defecto 8).
-export CONTENT_CALLS_LIMIT="${CONTENT_CALLS_LIMIT:-8}"
 
 # Nivel de logging (si DEBUG=true incluye Info y Debug; si false solo Warning y Error)
 export DEBUG="${DEBUG:-true}"

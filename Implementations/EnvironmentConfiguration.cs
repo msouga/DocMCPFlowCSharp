@@ -15,13 +15,10 @@ public class EnvironmentConfiguration : IConfiguration
     public TimeSpan HttpTimeout => int.TryParse(Environment.GetEnvironmentVariable("OPENAI_HTTP_TIMEOUT_SECONDS"), out var ts) && ts > 0 ? TimeSpan.FromSeconds(ts) : TimeSpan.FromMinutes(5);
     public bool TreatRefusalAsError => (Environment.GetEnvironmentVariable("TREAT_REFUSAL_AS_ERROR") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool DemoMode => (Environment.GetEnvironmentVariable("DEMO_MODE") ?? "true").Trim().ToLowerInvariant() == "true";
-    public int ContentCallsLimit
-        => int.TryParse(Environment.GetEnvironmentVariable("CONTENT_CALLS_LIMIT"), out var limit) && limit > 0
-            ? limit
-            : 8;
     public bool DebugLogging => (Environment.GetEnvironmentVariable("DEBUG") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool UseResponsesApi => (Environment.GetEnvironmentVariable("USE_RESPONSES_API") ?? "false").Trim().ToLowerInvariant() == "true";
     public bool CacheSystemInput => (Environment.GetEnvironmentVariable("CACHE_SYSTEM_INPUT") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool CacheBookContext => (Environment.GetEnvironmentVariable("CACHE_BOOK_CONTEXT") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool ResponsesStrictJson => (Environment.GetEnvironmentVariable("RESPONSES_STRICT_JSON") ?? "false").Trim().ToLowerInvariant() == "true";
+    public string? OpenAiBetaHeader => Environment.GetEnvironmentVariable("OPENAI_BETA_HEADER");
 }
