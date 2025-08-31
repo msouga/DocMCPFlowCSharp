@@ -90,3 +90,4 @@ La autenticación se realiza mediante la variable `OPENAI_API_KEY`. El cliente `
 
 - Objetivo de framework: `net9.0` (ver `DocMCPFlowCSharp.csproj`). Asegúrate de tener .NET 9 instalado.
 - Modelos: puedes cambiar el modelo con `OPENAI_MODEL`.
+- Límite de tokens: se aplica de forma best‑effort según la versión del SDK `OpenAI`. El cliente intenta usar `ChatCompletionOptions` y establecer `MaxOutputTokens`/`MaxTokens` si existen; si no, continúa sin límite explícito.
