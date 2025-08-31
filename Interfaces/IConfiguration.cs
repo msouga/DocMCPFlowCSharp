@@ -13,4 +13,5 @@ public interface IConfiguration
     bool TreatRefusalAsError { get; }
     bool DemoMode { get; }
     int ContentCallsLimit { get; }
+    bool DebugLogging { get; }
 }

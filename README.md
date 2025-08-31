@@ -31,6 +31,7 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
      export TREAT_REFUSAL_AS_ERROR=true       # opcional
      export DEMO_MODE=true                    # opcional (índice 2×2 por defecto)
      export CONTENT_CALLS_LIMIT=8             # opcional (máx. llamadas de contenido)
+     export DEBUG=true                        # opcional (true: Info+Debug; false: solo Warning+Error)
      ```
 
 3) Compilar y ejecutar:
@@ -50,6 +51,7 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
 - `TREAT_REFUSAL_AS_ERROR`: si `true`, trata una negativa del modelo como error fatal. Defecto: `true`.
 - `DEMO_MODE`: si `true`, limita el índice a 2 capítulos con 2 subcapítulos cada uno para pruebas. Defecto: `true`.
 - `CONTENT_CALLS_LIMIT`: número máximo de llamadas a IA para generar contenido de subcapítulos. Defecto: `8`.
+- `DEBUG`: si `true`, el logging incluye niveles Information y Debug; si `false`, solo Warning y Error. Defecto: `true`.
 
 Estas opciones se leen en `Implementations/EnvironmentConfiguration.cs` y en `Program.cs`.
 

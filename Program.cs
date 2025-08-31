@@ -26,10 +26,12 @@ internal class Program
             RunContext.BackRunDirectory = runDir;
             RunContext.RootLogPath = rootLogPath;
             // Construir ILogger (consola + archivo back + archivo root)
+            var minLevel = config.DebugLogging ? LogLevel.Debug : LogLevel.Warning;
             using var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
             {
+                builder.SetMinimumLevel(minLevel);
                 builder.AddConsole();
-                builder.AddProvider(new FileLoggerProvider(backLogPath, rootLogPath));
+                builder.AddProvider(new FileLoggerProvider(backLogPath, rootLogPath, minLevel));
             });
             var log = loggerFactory.CreateLogger<Program>();
             log.LogInformation($"Inicio de sesión — {DateTime.Now:O}");
@@ -66,8 +68,10 @@ internal class Program
             ui.WriteLine("[Aviso] No se pudo inicializar el logging en archivos. Continuando solo con consola.", ConsoleColor.Yellow);
             ui.WriteLine(ex.Message, ConsoleColor.DarkYellow);
 
+            var minLevel = config.DebugLogging ? LogLevel.Debug : LogLevel.Warning;
             using var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
             {
+                builder.SetMinimumLevel(minLevel);
                 builder.AddConsole();
             });
             var log = loggerFactory.CreateLogger<Program>();

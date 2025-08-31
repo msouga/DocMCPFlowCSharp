@@ -19,4 +19,5 @@ public class EnvironmentConfiguration : IConfiguration
         => int.TryParse(Environment.GetEnvironmentVariable("CONTENT_CALLS_LIMIT"), out var limit) && limit > 0
             ? limit
             : 8;
+    public bool DebugLogging => (Environment.GetEnvironmentVariable("DEBUG") ?? "true").Trim().ToLowerInvariant() == "true";
 }

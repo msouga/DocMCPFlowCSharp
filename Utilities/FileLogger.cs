@@ -7,11 +7,13 @@ public class FileLoggerProvider : ILoggerProvider
 {
     private readonly string _backLogPath;
     private readonly string _rootLogPath;
+    private readonly LogLevel _minLevel;
 
-    public FileLoggerProvider(string backLogPath, string rootLogPath)
+    public FileLoggerProvider(string backLogPath, string rootLogPath, LogLevel minLevel)
     {
         _backLogPath = backLogPath;
         _rootLogPath = rootLogPath;
+        _minLevel = minLevel;
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_backLogPath)!);
@@ -22,7 +24,7 @@ public class FileLoggerProvider : ILoggerProvider
         catch { /* best effort */ }
     }
 
-    public ILogger CreateLogger(string categoryName) => new FileLogger(categoryName, _backLogPath, _rootLogPath);
+    public ILogger CreateLogger(string categoryName) => new FileLogger(categoryName, _backLogPath, _rootLogPath, _minLevel);
 
     public void Dispose() { }
 }
@@ -32,18 +34,20 @@ internal class FileLogger : ILogger
     private readonly string _category;
     private readonly string _backLogPath;
     private readonly string _rootLogPath;
+    private readonly LogLevel _minLevel;
     private static readonly object _sync = new();
 
-    public FileLogger(string category, string backLogPath, string rootLogPath)
+    public FileLogger(string category, string backLogPath, string rootLogPath, LogLevel minLevel)
     {
         _category = category;
         _backLogPath = backLogPath;
         _rootLogPath = rootLogPath;
+        _minLevel = minLevel;
     }
 
     public IDisposable BeginScope<TState>(TState state) => default!;
 
-    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+    public bool IsEnabled(LogLevel logLevel) => logLevel >= _minLevel;
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
@@ -61,4 +65,3 @@ internal class FileLogger : ILogger
         catch { /* no romper ejecución por fallos de log */ }
     }
 }
-

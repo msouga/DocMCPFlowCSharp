@@ -41,5 +41,8 @@ export DEMO_MODE="${DEMO_MODE:-true}"
 # Límite de llamadas a IA para generar contenido (por defecto 8).
 export CONTENT_CALLS_LIMIT="${CONTENT_CALLS_LIMIT:-8}"
 
+# Nivel de logging (si DEBUG=true incluye Info y Debug; si false solo Warning y Error)
+export DEBUG="${DEBUG:-true}"
+
 echo "✅ Plantilla de variables de entorno cargada (sin credenciales)."
 echo "ℹ️ Copia a configurar_entorno.sh y añade tu clave real."
