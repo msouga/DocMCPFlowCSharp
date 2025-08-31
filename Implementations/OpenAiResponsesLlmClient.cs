@@ -23,10 +23,6 @@ public class OpenAiResponsesLlmClient : ILlmClient
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         if (string.IsNullOrEmpty(apiKey)) throw new InvalidOperationException("OPENAI_API_KEY not set");
         _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
-        if (!string.IsNullOrWhiteSpace(config.OpenAiBetaHeader))
-        {
-            _http.DefaultRequestHeaders.TryAddWithoutValidation("OpenAI-Beta", config.OpenAiBetaHeader);
-        }
     }
 
     public async Task<string> AskAsync(string system, string user, string model, int maxTokens, string? jsonSchema = null)

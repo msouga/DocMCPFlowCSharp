@@ -17,5 +17,4 @@ public interface IConfiguration
     bool CacheSystemInput { get; }
     bool CacheBookContext { get; }
     bool ResponsesStrictJson { get; }
-    string? OpenAiBetaHeader { get; }
 }

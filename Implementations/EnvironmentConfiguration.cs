@@ -20,5 +20,4 @@ public class EnvironmentConfiguration : IConfiguration
     public bool CacheSystemInput => (Environment.GetEnvironmentVariable("CACHE_SYSTEM_INPUT") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool CacheBookContext => (Environment.GetEnvironmentVariable("CACHE_BOOK_CONTEXT") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool ResponsesStrictJson => (Environment.GetEnvironmentVariable("RESPONSES_STRICT_JSON") ?? "false").Trim().ToLowerInvariant() == "true";
-    public string? OpenAiBetaHeader => Environment.GetEnvironmentVariable("OPENAI_BETA_HEADER");
 }

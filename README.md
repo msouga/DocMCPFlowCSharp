@@ -35,7 +35,6 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
      export CACHE_SYSTEM_INPUT=true           # opcional (cachea el system prompt)
      export CACHE_BOOK_CONTEXT=true           # opcional (cachea contexto del libro por corrida)
      export RESPONSES_STRICT_JSON=false       # opcional (usa text.format para forzar JSON)
-     export OPENAI_BETA_HEADER=""            # opcional (valor para cabecera OpenAI-Beta si tu cuenta lo requiere)
      ```
 
 3) Compilar y ejecutar:
