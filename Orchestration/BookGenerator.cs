@@ -64,7 +64,7 @@ public class BookGenerator : IBookFlowOrchestrator
         }
 
         _ui.WriteLine("\n[Proceso] Generando contenido completo del documento...", ConsoleColor.Green);
-        await GenerateContentForLeaves();
+        await GenerateChapterAndSubchapterContent();
         await _writer.SaveAsync(_spec, final: true);
         _logger.LogInformation("Guardado final de manuscrito (contenido completo)");
         
@@ -346,62 +346,60 @@ public class BookGenerator : IBookFlowOrchestrator
         }
     }
 
-    private async Task GenerateContentForLeaves()
+    private async Task GenerateChapterAndSubchapterContent()
     {
-        var leaves = GetLeavesInOrder(_spec.TableOfContents);
-        foreach (var leaf in leaves)
+        // Recorre capítulos principales: genera contenido del capítulo y luego el de sus subcapítulos hoja
+        for (int i = 0; i < _spec.TableOfContents.Count; i++)
         {
-            var (_, parent) = FindNode(_spec.TableOfContents, leaf.Number);
-            if (parent == null)
-                continue;
+            var chapter = _spec.TableOfContents[i];
 
-            // Resumen del capítulo principal anterior
-            var mainNum = parent.Number.Split('.').First();
-            string prevMainSummary = "(ninguno)";
-            if (int.TryParse(mainNum, out var mainIdx) && mainIdx > 1)
-            {
-                var prevNum = (mainIdx - 1).ToString();
-                var (prevMain, _) = FindNode(_spec.TableOfContents, prevNum);
-                if (prevMain != null)
-                    prevMainSummary = prevMain.Summary ?? "(ninguno)";
-            }
-
-            _ui.WriteLine($"\n>>> Generando contenido para {leaf.Number} {leaf.Title} …", ConsoleColor.Cyan);
-            _logger.LogInformation("LLM Content prompt para subcapítulo {Number}: '{Title}'", leaf.Number, leaf.Title);
-
-            var prompt = PromptBuilder.GetSubchapterContentPrompt(
+            // 1) Generar contenido del capítulo principal (aunque tenga subcapítulos)
+            string parentSummary = "(ninguno)";
+            _ui.WriteLine($"\n>>> Generando contenido para {chapter.Number} {chapter.Title} …", ConsoleColor.Cyan);
+            _logger.LogInformation("LLM Content prompt para capítulo {Number}: '{Title}'", chapter.Number, chapter.Title);
+            var chapterPrompt = PromptBuilder.GetChapterPrompt(
                 _spec.Title,
                 _spec.Topic,
                 _spec.TargetAudience,
-                leaf,
-                parent,
-                prevMainSummary,
+                BuildTocString(),
+                chapter,
+                parentSummary,
                 _config.TargetWordsPerChapter);
-
-            leaf.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
-            _logger.LogInformation("Contenido recibido subcapítulo {Number} (len={Len}) – guardando", leaf.Number, leaf.Content?.Length ?? 0);
+            chapter.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, chapterPrompt, _config.Model, _config.MaxTokensPerCall);
+            _logger.LogInformation("Contenido recibido capítulo {Number} (len={Len}) – guardando", chapter.Number, chapter.Content?.Length ?? 0);
             await _writer.SaveAsync(_spec);
-        }
-    }
 
-    private List<ChapterNode> GetLeavesInOrder(List<ChapterNode> nodes)
-    {
-        var result = new List<ChapterNode>();
-        foreach (var n in nodes)
-        {
-            if (n.SubChapters.Any())
+            // 2) Generar contenido para subcapítulos hoja
+            if (chapter.SubChapters.Any())
             {
-                foreach (var sc in n.SubChapters)
+                // Resumen del capítulo principal anterior (para continuidad entre capítulos)
+                string prevMainSummary = "(ninguno)";
+                if (i - 1 >= 0)
                 {
-                    if (!sc.SubChapters.Any()) result.Add(sc);
+                    var prev = _spec.TableOfContents[i - 1];
+                    prevMainSummary = prev.Summary ?? "(ninguno)";
+                }
+
+                foreach (var sc in chapter.SubChapters)
+                {
+                    if (sc.SubChapters.Any()) continue; // solo hojas
+
+                    _ui.WriteLine($"\n>>> Generando contenido para {sc.Number} {sc.Title} …", ConsoleColor.Cyan);
+                    _logger.LogInformation("LLM Content prompt para subcapítulo {Number}: '{Title}'", sc.Number, sc.Title);
+                    var prompt = PromptBuilder.GetSubchapterContentPrompt(
+                        _spec.Title,
+                        _spec.Topic,
+                        _spec.TargetAudience,
+                        sc,
+                        chapter,
+                        prevMainSummary,
+                        _config.TargetWordsPerChapter);
+                    sc.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
+                    _logger.LogInformation("Contenido recibido subcapítulo {Number} (len={Len}) – guardando", sc.Number, sc.Content?.Length ?? 0);
+                    await _writer.SaveAsync(_spec);
                 }
             }
-            else
-            {
-                result.Add(n);
-            }
         }
-        return result;
     }
 
     private string BuildTocString()
