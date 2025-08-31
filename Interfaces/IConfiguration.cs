@@ -11,4 +11,5 @@ public interface IConfiguration
     int PrevChapterTailChars { get; }
     TimeSpan HttpTimeout { get; }
     bool TreatRefusalAsError { get; }
+    bool DemoMode { get; }
 }

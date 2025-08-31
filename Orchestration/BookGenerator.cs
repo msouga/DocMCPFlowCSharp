@@ -65,11 +65,18 @@ public class BookGenerator : IBookFlowOrchestrator
 
     private async Task GenerateTableOfContents()
     {
+        if (_config.DemoMode)
+        {
+            _ui.WriteLine("\n[Demo] Modo demo activo: usando índice mínimo (2 capítulos × 2 subcapítulos).", ConsoleColor.Yellow);
+            _spec.TableOfContents = BuildDemoToc();
+            return;
+        }
+
         _ui.WriteLine("\n[Proceso] Generando propuesta de estructura de capítulos...", ConsoleColor.Green);
         var prompt = PromptBuilder.GetIndexPrompt(_spec.Title, _spec.Topic, _spec.TargetAudience);
-        
+
         var jsonResponse = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
-        
+
         try
         {
             _spec.TableOfContents = ParseToc(jsonResponse);
@@ -80,6 +87,31 @@ public class BookGenerator : IBookFlowOrchestrator
             _ui.WriteLine("No se pudo generar una estructura. Saliendo.", ConsoleColor.Red);
             Environment.Exit(1);
         }
+    }
+
+    private List<ChapterNode> BuildDemoToc()
+    {
+        return new List<ChapterNode>
+        {
+            new ChapterNode
+            {
+                Title = "Capítulo 1: Conceptos básicos",
+                SubChapters =
+                {
+                    new ChapterNode{ Title = "1.1 Introducción" },
+                    new ChapterNode{ Title = "1.2 Primeros pasos" }
+                }
+            },
+            new ChapterNode
+            {
+                Title = "Capítulo 2: Aplicación práctica",
+                SubChapters =
+                {
+                    new ChapterNode{ Title = "2.1 Ejemplo guiado" },
+                    new ChapterNode{ Title = "2.2 Buenas prácticas" }
+                }
+            }
+        };
     }
 
     private List<ChapterNode> ParseToc(string json)
