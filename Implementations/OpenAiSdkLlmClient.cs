@@ -33,6 +33,13 @@ public class OpenAiSdkLlmClient : ILlmClient
 
         try
         {
+            var preview = user.Length > 120 ? user.Substring(0, 120) + "…" : user;
+            Logger.Append($"OpenAI request → model={model}, maxTokens={maxTokens}, userPreview=\"{preview.Replace("\n", " ")}\"");
+        }
+        catch { /* best-effort logging */ }
+
+        try
+        {
             // Intentar configurar límite de tokens si la versión del SDK lo soporta
             // Algunas versiones exponen un objeto de opciones para límites
             ChatCompletion completion;
@@ -53,11 +60,13 @@ public class OpenAiSdkLlmClient : ILlmClient
                 // Fallback si el tipo de opciones no existe en esta versión
                 completion = await _client.CompleteChatAsync(messages);
             }
+            try { Logger.Append($"OpenAI response ← len={completion.Content?[0]?.Text?.Length ?? 0}"); } catch { }
             return completion.Content[0].Text;
         }
         catch (Exception ex)
         {
             _ui.WriteLine($"Ocurrió un error al llamar a la API de OpenAI: {ex.Message}", ConsoleColor.Red);
+            try { Logger.Append($"OpenAI error: {ex.Message}"); } catch { }
             return string.Empty;
         }
     }

@@ -40,12 +40,14 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         AppendContent(fullManuscript, spec.TableOfContents, 1);
 
         await System.IO.File.WriteAllTextAsync("manuscrito.md", fullManuscript.ToString(), Encoding.UTF8);
+        Logger.Append("Archivo manuscrito.md actualizado");
 
         if (final)
         {
             var onlyChapters = new StringBuilder();
             AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: false);
             await System.IO.File.WriteAllTextAsync("manuscrito_capitulos.md", onlyChapters.ToString(), Encoding.UTF8);
+            Logger.Append("Archivo manuscrito_capitulos.md actualizado (final)");
         }
     }
 

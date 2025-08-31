@@ -53,8 +53,6 @@ Contexto del Documento:
 - Título General: ""{title}""
 - Tema Principal: {topic}
 - Público Objetivo: {audience}
-- Tabla de Contenidos Completa:
-{fullToc}
 - Resumen de la sección actual:
 {summary}
 - Resumen del capítulo padre (si aplica):
@@ -65,6 +63,27 @@ Requisitos:
 - El objetivo de extensión es de {targetWords} palabras.
 - La salida debe ser en formato Markdown.
 - Empieza directamente con el contenido, no repitas el título del capítulo.";
+
+    private const string SubchapterContentPromptTemplate = @"Redacta el contenido del subcapítulo **{sectionNumber} — {sectionTitle}** en español y formato Markdown.
+
+Contexto:
+- Título del Documento: ""{title}""
+- Tema: {topic}
+- Público: {audience}
+- Resumen del capítulo anterior:
+{prevMainSummary}
+- Resumen del capítulo actual:
+{currentMainSummary}
+- Resúmenes de los subcapítulos de este capítulo:
+{subchapterSummaries}
+- Contenido del subcapítulo anterior (para continuidad):
+{previousSiblingContent}
+
+Requisitos:
+- Extensión objetivo: {targetWords} palabras.
+- Estructura clara, con subtítulos si aplica.
+- No repitas el título; empieza directamente con el contenido.
+- Mantén coherencia y continuidad con el contenido previo si existe.";
 
     public static string GetIndexPrompt(string title, string topic, string audience) 
     {
@@ -103,9 +122,44 @@ Requisitos:
             .Replace("{title}", title)
             .Replace("{topic}", topic)
             .Replace("{audience}", audience)
-            .Replace("{fullToc}", fullToc)
             .Replace("{summary}", node.Summary)
             .Replace("{parentSummary}", parentSummary)
+            .Replace("{targetWords}", targetWords.ToString());
+    }
+
+    public static string GetSubchapterContentPrompt(
+        string title,
+        string topic,
+        string audience,
+        ChapterNode subchapter,
+        ChapterNode parentChapter,
+        string previousMainSummary,
+        int targetWords)
+    {
+        var subSummaries = new StringBuilder();
+        foreach (var sc in parentChapter.SubChapters)
+        {
+            var sum = string.IsNullOrWhiteSpace(sc.Summary) ? "(sin resumen)" : sc.Summary;
+            subSummaries.AppendLine($"- {sc.Number} {sc.Title}: {sum}");
+        }
+
+        var prevSiblingContent = "";
+        var idx = parentChapter.SubChapters.FindIndex(s => s.Number == subchapter.Number);
+        if (idx > 0)
+        {
+            prevSiblingContent = parentChapter.SubChapters[idx - 1].Content ?? string.Empty;
+        }
+
+        return SubchapterContentPromptTemplate
+            .Replace("{sectionNumber}", subchapter.Number)
+            .Replace("{sectionTitle}", subchapter.Title)
+            .Replace("{title}", title)
+            .Replace("{topic}", topic)
+            .Replace("{audience}", audience)
+            .Replace("{prevMainSummary}", string.IsNullOrWhiteSpace(previousMainSummary) ? "(ninguno)" : previousMainSummary)
+            .Replace("{currentMainSummary}", string.IsNullOrWhiteSpace(parentChapter.Summary) ? "(ninguno)" : parentChapter.Summary)
+            .Replace("{subchapterSummaries}", subSummaries.ToString())
+            .Replace("{previousSiblingContent}", string.IsNullOrWhiteSpace(prevSiblingContent) ? "(sin contenido previo)" : prevSiblingContent)
             .Replace("{targetWords}", targetWords.ToString());
     }
 

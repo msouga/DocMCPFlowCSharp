@@ -19,6 +19,8 @@ internal class Program
         try
         {
             await System.IO.File.WriteAllTextAsync(logFilePath, $"# Log de sesión — {DateTime.Now:O}\n\n");
+            Logger.Init(logFilePath);
+            Logger.Append("Inicio de sesión y preparación de entorno");
         }
         catch { /* si no se puede escribir, seguimos sin romper */ }
 
@@ -30,18 +32,22 @@ internal class Program
         var flowSw = Stopwatch.StartNew();
         try
         {
+            Logger.Append("Arrancando orquestador de flujo (BookGenerator.RunAsync)");
             await orchestrator.RunAsync();
+            Logger.Append("Ejecución de orquestador completada");
         }
         catch (Exception ex)
         {
             ui.WriteLine($"\n[ERROR FATAL] {ex.Message}", ConsoleColor.Red);
             ui.WriteLine(ex.ToString(), ConsoleColor.DarkRed);
+            Logger.Append($"ERROR FATAL: {ex}");
         }
         finally
         {
             flowSw.Stop();
             llmClient.PrintUsage();
             ui.WriteLine($"Tiempo total: {flowSw.Elapsed}", ConsoleColor.Magenta);
+            Logger.Append($"Tiempo total: {flowSw.Elapsed}");
         }
     }
 }

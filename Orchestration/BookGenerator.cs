@@ -24,16 +24,20 @@ public class BookGenerator : IBookFlowOrchestrator
     public async Task RunAsync()
     {
         CollectInitialInputs();
+        Logger.Append($"Entradas iniciales — Título: '{_spec.Title}', Público: '{_spec.TargetAudience}', Tema: '{_spec.Topic}'");
         await GenerateTableOfContents();
         DisplayAndEditTableOfContents();
+        Logger.Append("Índice finalizado por el usuario");
         NumberNodes(_spec.TableOfContents, "");
 
         await GenerateIntroduction();
+        Logger.Append($"Introducción generada (len={_spec.Introduction?.Length ?? 0})");
 
         _ui.WriteLine("\n[Proceso] Generando resúmenes para la estructura final...", ConsoleColor.Green);
         await GenerateSummaries();
         DisplaySummaries();
         await _writer.SaveAsync(_spec);
+        Logger.Append("Guardado de manuscrito luego de resúmenes");
 
         if (_config.IsDryRun)
         {
@@ -42,8 +46,9 @@ public class BookGenerator : IBookFlowOrchestrator
         }
 
         _ui.WriteLine("\n[Proceso] Generando contenido completo del documento...", ConsoleColor.Green);
-        await GenerateContent(_spec.TableOfContents, null);
+        await GenerateContentForLeaves();
         await _writer.SaveAsync(_spec, final: true);
+        Logger.Append("Guardado final de manuscrito (contenido completo)");
         
         _ui.WriteLine("\nListo. Archivo generado: manuscrito.md\n", ConsoleColor.Green);
     }
@@ -69,6 +74,7 @@ public class BookGenerator : IBookFlowOrchestrator
         {
             _ui.WriteLine("\n[Demo] Modo demo activo: usando índice mínimo (2 capítulos × 2 subcapítulos).", ConsoleColor.Yellow);
             _spec.TableOfContents = BuildDemoToc();
+            Logger.Append("DemoMode: TOC demo 2x2 construido");
             return;
         }
 
@@ -80,11 +86,13 @@ public class BookGenerator : IBookFlowOrchestrator
         try
         {
             _spec.TableOfContents = ParseToc(jsonResponse);
+            Logger.Append($"TOC generado por LLM (nodos raíz={_spec.TableOfContents.Count})");
         }
         catch (JsonException ex)
         {
             _ui.WriteLine($"Error al procesar la estructura JSON: {ex.Message}", ConsoleColor.Red);
             _ui.WriteLine("No se pudo generar una estructura. Saliendo.", ConsoleColor.Red);
+            Logger.Append($"Error al parsear TOC JSON: {ex.Message}");
             Environment.Exit(1);
         }
     }
@@ -242,24 +250,29 @@ public class BookGenerator : IBookFlowOrchestrator
         {
             _ui.WriteLine($"- Generando resúmenes para el bloque del capítulo {chapter.Number} {chapter.Title} ...", ConsoleColor.DarkGray);
             var prompt = PromptBuilder.GetSummariesForChapterBlockPrompt(_spec.Title, _spec.TargetAudience, chapter, previousSummary);
+            Logger.Append($"LLM Summaries prompt para capítulo {chapter.Number}: '{chapter.Title}'");
             
             var summariesJson = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall, jsonSchema: "{{}}"); // Request JSON output
 
             try
             {
                 using var doc = JsonDocument.Parse(summariesJson);
+                int count = 0;
                 foreach (var prop in doc.RootElement.EnumerateObject())
                 {
                     var (node, _) = FindNode(_spec.TableOfContents, prop.Name);
                     if (node != null)
                     {
                         node.Summary = prop.Value.GetString() ?? "";
+                        count++;
                     }
                 }
+                Logger.Append($"Resúmenes actualizados para capítulo {chapter.Number}: {count} nodos");
             }
             catch (JsonException ex)
             {
                 _ui.WriteLine($"Error al procesar resúmenes JSON para el capítulo {chapter.Number}: {ex.Message}.", ConsoleColor.Yellow);
+                Logger.Append($"Error al parsear resúmenes capítulo {chapter.Number}: {ex.Message}");
             }
 
             previousSummary = chapter.Summary;
@@ -302,8 +315,10 @@ public class BookGenerator : IBookFlowOrchestrator
             }
 
             _ui.WriteLine($"\n>>> Generando contenido para {node.Number} {node.Title} …", ConsoleColor.Cyan);
+            Logger.Append($"LLM Content prompt para nodo {node.Number}: '{node.Title}'");
             var prompt = PromptBuilder.GetChapterPrompt(_spec.Title, _spec.Topic, _spec.TargetAudience, fullToc, node, parentSummary, _config.TargetWordsPerChapter);
             node.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
+            Logger.Append($"Contenido recibido nodo {node.Number} (len={node.Content?.Length ?? 0}) – guardando");
             await _writer.SaveAsync(_spec);
 
             if (node.SubChapters.Any())
@@ -311,6 +326,74 @@ public class BookGenerator : IBookFlowOrchestrator
                 await GenerateContent(node.SubChapters, node);
             }
         }
+    }
+
+    private int _contentCalls;
+    private async Task GenerateContentForLeaves()
+    {
+        _contentCalls = 0;
+        var leaves = GetLeavesInOrder(_spec.TableOfContents);
+        foreach (var leaf in leaves)
+        {
+            if (_contentCalls >= 8)
+            {
+                _ui.WriteLine("\n[Límite] Se alcanzó el máximo de 8 llamadas a IA para contenido.", ConsoleColor.Yellow);
+                Logger.Append("Límite de 8 llamadas de contenido alcanzado; deteniendo generación adicional");
+                break;
+            }
+
+            var (_, parent) = FindNode(_spec.TableOfContents, leaf.Number);
+            if (parent == null)
+                continue;
+
+            // Resumen del capítulo principal anterior
+            var mainNum = parent.Number.Split('.').First();
+            string prevMainSummary = "(ninguno)";
+            if (int.TryParse(mainNum, out var mainIdx) && mainIdx > 1)
+            {
+                var prevNum = (mainIdx - 1).ToString();
+                var (prevMain, _) = FindNode(_spec.TableOfContents, prevNum);
+                if (prevMain != null)
+                    prevMainSummary = prevMain.Summary ?? "(ninguno)";
+            }
+
+            _ui.WriteLine($"\n>>> Generando contenido para {leaf.Number} {leaf.Title} …", ConsoleColor.Cyan);
+            Logger.Append($"LLM Content prompt para subcapítulo {leaf.Number}: '{leaf.Title}'");
+
+            var prompt = PromptBuilder.GetSubchapterContentPrompt(
+                _spec.Title,
+                _spec.Topic,
+                _spec.TargetAudience,
+                leaf,
+                parent,
+                prevMainSummary,
+                _config.TargetWordsPerChapter);
+
+            leaf.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
+            _contentCalls++;
+            Logger.Append($"Contenido recibido subcapítulo {leaf.Number} (len={leaf.Content?.Length ?? 0}) – guardando");
+            await _writer.SaveAsync(_spec);
+        }
+    }
+
+    private List<ChapterNode> GetLeavesInOrder(List<ChapterNode> nodes)
+    {
+        var result = new List<ChapterNode>();
+        foreach (var n in nodes)
+        {
+            if (n.SubChapters.Any())
+            {
+                foreach (var sc in n.SubChapters)
+                {
+                    if (!sc.SubChapters.Any()) result.Add(sc);
+                }
+            }
+            else
+            {
+                result.Add(n);
+            }
+        }
+        return result;
     }
 
     private string BuildTocString()
