@@ -34,11 +34,6 @@ public class OpenAiSdkLlmClient : ILlmClient
         // Pass settings directly in the request object
         var chatRequest = new ChatRequest(messages, model: model, maxTokens: maxTokens);
 
-        if (!string.IsNullOrEmpty(jsonSchema))
-        {
-             _ui.WriteLine("[Advertencia] Forzar salida JSON no está implementado con esta librería, el schema será ignorado.", ConsoleColor.DarkYellow);
-        }
-
         try
         {
             ChatCompletion completion = await _client.CompleteChatAsync(chatRequest);
