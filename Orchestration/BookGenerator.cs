@@ -33,6 +33,21 @@ public class BookGenerator : IBookFlowOrchestrator
         _logger.LogInformation("Índice finalizado por el usuario");
         NumberNodes(_spec.TableOfContents, "");
 
+        // Definir contexto estable del libro para Responses API cacheable (por corrida)
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Contexto del Libro (estable por corrida):");
+            sb.AppendLine($"- Título: {_spec.Title}");
+            sb.AppendLine($"- Público: {_spec.TargetAudience}");
+            sb.AppendLine($"- Tema: {_spec.Topic}");
+            sb.AppendLine("- TOC:");
+            sb.AppendLine(BuildTocString());
+            RunContext.BookContextStable = sb.ToString();
+            _logger.LogInformation("BookContextStable preparado (len={Len})", RunContext.BookContextStable.Length);
+        }
+        catch { /* best-effort */ }
+
         await GenerateIntroduction();
         _logger.LogInformation("Introducción generada (len={Len})", _spec.Introduction?.Length ?? 0);
 

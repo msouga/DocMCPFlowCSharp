@@ -14,4 +14,7 @@ public interface IConfiguration
     bool DemoMode { get; }
     int ContentCallsLimit { get; }
     bool DebugLogging { get; }
+    bool UseResponsesApi { get; }
+    bool CacheSystemInput { get; }
+    bool CacheBookContext { get; }
 }

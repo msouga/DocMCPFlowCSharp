@@ -44,5 +44,10 @@ export CONTENT_CALLS_LIMIT="${CONTENT_CALLS_LIMIT:-8}"
 # Nivel de logging (si DEBUG=true incluye Info y Debug; si false solo Warning y Error)
 export DEBUG="${DEBUG:-true}"
 
+# Alternar API de Responses (cache de input) vs Chat
+export USE_RESPONSES_API="${USE_RESPONSES_API:-false}"
+export CACHE_SYSTEM_INPUT="${CACHE_SYSTEM_INPUT:-true}"
+export CACHE_BOOK_CONTEXT="${CACHE_BOOK_CONTEXT:-true}"
+
 echo "✅ Plantilla de variables de entorno cargada (sin credenciales)."
 echo "ℹ️ Copia a configurar_entorno.sh y añade tu clave real."

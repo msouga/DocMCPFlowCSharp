@@ -36,7 +36,9 @@ internal class Program
             var log = loggerFactory.CreateLogger<Program>();
             log.LogInformation($"Inicio de sesión — {DateTime.Now:O}");
 
-            var llmClient = new OpenAiSdkLlmClient(config, ui, loggerFactory.CreateLogger<OpenAiSdkLlmClient>());
+            ILlmClient llmClient = config.UseResponsesApi
+                ? new OpenAiResponsesLlmClient(config, ui, loggerFactory.CreateLogger<OpenAiResponsesLlmClient>())
+                : new OpenAiSdkLlmClient(config, ui, loggerFactory.CreateLogger<OpenAiSdkLlmClient>());
             var manuscriptWriter = new MarkdownManuscriptWriter(loggerFactory.CreateLogger<MarkdownManuscriptWriter>());
             
             var orchestrator = new BookGenerator(config, ui, llmClient, manuscriptWriter, loggerFactory.CreateLogger<BookGenerator>());

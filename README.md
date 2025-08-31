@@ -32,6 +32,9 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
      export DEMO_MODE=true                    # opcional (índice 2×2 por defecto)
      export CONTENT_CALLS_LIMIT=8             # opcional (máx. llamadas de contenido)
      export DEBUG=true                        # opcional (true: Info+Debug; false: solo Warning+Error)
+     export USE_RESPONSES_API=false           # opcional (true usa /v1/responses con caché de input)
+     export CACHE_SYSTEM_INPUT=true           # opcional (cachea el system prompt)
+     export CACHE_BOOK_CONTEXT=true           # opcional (cachea contexto del libro por corrida)
      ```
 
 3) Compilar y ejecutar:
@@ -52,6 +55,9 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
 - `DEMO_MODE`: si `true`, limita el índice a 2 capítulos con 2 subcapítulos cada uno para pruebas. Defecto: `true`.
 - `CONTENT_CALLS_LIMIT`: número máximo de llamadas a IA para generar contenido de subcapítulos. Defecto: `8`.
 - `DEBUG`: si `true`, el logging incluye niveles Information y Debug; si `false`, solo Warning y Error. Defecto: `true`.
+- `USE_RESPONSES_API`: si `true`, usa el endpoint `/v1/responses` con soporte de caché de input; si `false`, usa el cliente Chat.
+- `CACHE_SYSTEM_INPUT`: si `true`, marca el system prompt como cacheable en Responses.
+- `CACHE_BOOK_CONTEXT`: si `true`, cachea un bloque estable por corrida (título, público, tema y TOC).
 
 Estas opciones se leen en `Implementations/EnvironmentConfiguration.cs` y en `Program.cs`.
 
@@ -95,3 +101,4 @@ La autenticación se realiza mediante la variable `OPENAI_API_KEY`. El cliente `
 - Objetivo de framework: `net9.0` (ver `DocMCPFlowCSharp.csproj`). Asegúrate de tener .NET 9 instalado.
 - Modelos: puedes cambiar el modelo con `OPENAI_MODEL`.
 - Límite de tokens: se aplica de forma best‑effort según la versión del SDK `OpenAI`. El cliente intenta usar `ChatCompletionOptions` y establecer `MaxOutputTokens`/`MaxTokens` si existen; si no, continúa sin límite explícito.
+ - Responses API: para gpt-5 / gpt-5-mini / gpt-5-nano puedes activar `USE_RESPONSES_API=true` y aprovechar caché de input efímero. Asegúrate de que el system/contexto estable no cambie entre llamadas para maximizar hits.
