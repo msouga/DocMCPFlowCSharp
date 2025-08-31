@@ -86,6 +86,32 @@ Requisitos:
 - No repitas el título; empieza directamente con el contenido.
 - Mantén coherencia y continuidad con el contenido previo si existe.";
 
+    private const string ChapterOverviewPromptTemplate = @"Redacta el contenido del capítulo **{chapterNumber} — {chapterTitle}** en español y formato Markdown.
+
+Contexto del Documento:
+- Título General: ""{title}""
+- Tema Principal: {topic}
+- Público Objetivo: {audience}
+
+Pistas de contenido:
+- Resumen del capítulo (si existe):
+{chapterSummary}
+- Resúmenes de sus subcapítulos:
+{subchapterSummaries}
+- Resumen del capítulo anterior:
+{previousChapterSummary}
+
+Requisitos:
+- Construye un texto fluido que introduzca y conecte los subtemas del capítulo.
+{targetWordsText}
+- La salida debe ser en formato Markdown.
+- Empieza directamente con el contenido, no repitas el título del capítulo.
+- No listes ni repitas títulos o numeraciones de subcapítulos (evita líneas como ""1.1 ..."", ""1.2 ..."").
+- No incluyas encabezados internos, listas, viñetas, bloques de código ni comandos.
+- Redacta 2 a 3 párrafos generales (120-200 palabras en total), de carácter conceptual y sin instrucciones paso a paso.
+
+    Ejemplo de estilo (no copiar literalmente): redactar 2 párrafos que enmarquen el capítulo a alto nivel, explicando cómo se relacionan los subtemas y qué decisiones o criterios importan, sin listas ni encabezados internos.";
+
     public static string GetIndexPrompt(string title, string topic, string audience) 
     {
         return IndexPromptTemplate
@@ -163,6 +189,33 @@ Requisitos:
             .Replace("{currentMainSummary}", string.IsNullOrWhiteSpace(parentChapter.Summary) ? "(ninguno)" : parentChapter.Summary)
             .Replace("{subchapterSummaries}", subSummaries.ToString())
             .Replace("{previousSiblingContent}", string.IsNullOrWhiteSpace(prevSiblingContent) ? "(sin contenido previo)" : prevSiblingContent)
+            .Replace("{targetWordsText}", targetWordsText);
+    }
+
+    public static string GetChapterOverviewPrompt(
+        string title,
+        string topic,
+        string audience,
+        ChapterNode chapter,
+        string previousChapterSummary,
+        int targetWords)
+    {
+        var subSummaries = new StringBuilder();
+        foreach (var sc in chapter.SubChapters)
+        {
+            var sum = string.IsNullOrWhiteSpace(sc.Summary) ? "(sin resumen)" : sc.Summary;
+            subSummaries.AppendLine($"- {sc.Number} {sc.Title}: {sum}");
+        }
+        var targetWordsText = targetWords > 0 ? $"- Extensión objetivo: {targetWords} palabras." : "";
+        return ChapterOverviewPromptTemplate
+            .Replace("{chapterNumber}", chapter.Number)
+            .Replace("{chapterTitle}", chapter.Title)
+            .Replace("{title}", title)
+            .Replace("{topic}", topic)
+            .Replace("{audience}", audience)
+            .Replace("{chapterSummary}", string.IsNullOrWhiteSpace(chapter.Summary) ? "(sin resumen)" : chapter.Summary)
+            .Replace("{subchapterSummaries}", subSummaries.ToString())
+            .Replace("{previousChapterSummary}", string.IsNullOrWhiteSpace(previousChapterSummary) ? "(ninguno)" : previousChapterSummary)
             .Replace("{targetWordsText}", targetWordsText);
     }
 

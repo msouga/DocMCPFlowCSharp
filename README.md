@@ -30,6 +30,8 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
      export SHOW_USAGE=true                   # opcional
      export TREAT_REFUSAL_AS_ERROR=true       # opcional
      export DEMO_MODE=true                    # opcional (índice 2×2 por defecto)
+     export NODE_DETAIL_WORDS=0               # opcional (0: ilimitado, nodos hoja)
+     export NODE_SUMMARY_WORDS=180            # opcional (nodos con hijos)
      export DEBUG=true                        # opcional (true: Info+Debug; false: solo Warning+Error)
      export USE_RESPONSES_API=false           # opcional (true usa /v1/responses con caché de input)
      export CACHE_SYSTEM_INPUT=true           # opcional (cachea el system prompt)
@@ -53,6 +55,8 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
 - `SHOW_USAGE`: si `true`, muestra uso de tokens al finalizar (no disponible con la lib actual; se avisa). Defecto: `true`.
 - `TREAT_REFUSAL_AS_ERROR`: si `true`, trata una negativa del modelo como error fatal. Defecto: `true`.
 - `DEMO_MODE`: si `true`, limita el índice a 2 capítulos con 2 subcapítulos cada uno para pruebas. Defecto: `true`.
+- `NODE_DETAIL_WORDS`: palabras objetivo para nodos hoja (sin hijos). 0 = ilimitado.
+- `NODE_SUMMARY_WORDS`: palabras objetivo para nodos con hijos (overview/resumen). No se aplica si el nodo es hoja.
   # (Se eliminó el límite de llamadas por contenido; usa DEMO_MODE para pruebas 2×2.)
 - `DEBUG`: si `true`, el logging incluye niveles Information y Debug; si `false`, solo Warning y Error. Defecto: `true`.
 - `USE_RESPONSES_API`: si `true`, usa el endpoint `/v1/responses` con soporte de caché de input; si `false`, usa el cliente Chat.

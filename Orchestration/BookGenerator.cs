@@ -31,7 +31,7 @@ public class BookGenerator : IBookFlowOrchestrator
         await GenerateTableOfContents();
         DisplayAndEditTableOfContents();
         _logger.LogInformation("Índice finalizado por el usuario");
-        NumberNodes(_spec.TableOfContents, "");
+        NumberNodes(_spec.TableOfContents, "", 1);
 
         // Definir contexto estable del libro para Responses API cacheable (por corrida)
         try
@@ -54,6 +54,20 @@ public class BookGenerator : IBookFlowOrchestrator
         _ui.WriteLine("\n[Proceso] Generando resúmenes para la estructura final...", ConsoleColor.Green);
         await GenerateSummaries();
         DisplaySummaries();
+        // Generar resumen del manual (overview del nodo raíz) usando los resúmenes de capítulos
+        try
+        {
+            var rootNode = new ChapterNode { Title = _spec.Title, Number = "", SubChapters = _spec.TableOfContents };
+            var manualOverviewPrompt = PromptBuilder.GetChapterOverviewPrompt(
+                _spec.Title,
+                _spec.Topic,
+                _spec.TargetAudience,
+                rootNode,
+                "(ninguno)",
+                _config.NodeSummaryWords);
+            _spec.ManualSummary = await _llm.AskAsync(PromptBuilder.SystemPrompt, manualOverviewPrompt, _config.Model, _config.MaxTokensPerCall);
+        }
+        catch {}
         await _writer.SaveAsync(_spec);
         _logger.LogInformation("Guardado de manuscrito luego de resúmenes");
 
@@ -175,7 +189,7 @@ public class BookGenerator : IBookFlowOrchestrator
         do
         {
             _ui.WriteLine("\n— Estructura Propuesta —", ConsoleColor.Yellow);
-            NumberNodes(_spec.TableOfContents, "");
+            NumberNodes(_spec.TableOfContents, "", 1);
             DisplayToc(_spec.TableOfContents, "");
             _ui.WriteLine("\nComandos: [editar <num>], [borrar <num>], [agregar <num>], [nuevo], [fin]", ConsoleColor.Yellow);
             command = _ui.ReadLine("> ").Trim().ToLower();
@@ -237,16 +251,17 @@ public class BookGenerator : IBookFlowOrchestrator
         return (null, null);
     }
 
-    private void NumberNodes(List<ChapterNode> nodes, string prefix)
+    private void NumberNodes(List<ChapterNode> nodes, string prefix, int level)
     {
         for (int i = 0; i < nodes.Count; i++)
         {
             var node = nodes[i];
             var currentNumber = $"{prefix}{i + 1}";
             node.Number = currentNumber;
+            node.Level = level;
             if (node.SubChapters.Any())
             {
-                NumberNodes(node.SubChapters, currentNumber + ".");
+                NumberNodes(node.SubChapters, currentNumber + ".", level + 1);
             }
         }
     }
@@ -334,7 +349,7 @@ public class BookGenerator : IBookFlowOrchestrator
 
             _ui.WriteLine($"\n>>> Generando contenido para {node.Number} {node.Title} …", ConsoleColor.Cyan);
             _logger.LogInformation("LLM Content prompt para nodo {Number}: '{Title}'", node.Number, node.Title);
-            var prompt = PromptBuilder.GetChapterPrompt(_spec.Title, _spec.Topic, _spec.TargetAudience, fullToc, node, parentSummary, _config.TargetWordsPerChapter);
+            var prompt = PromptBuilder.GetChapterPrompt(_spec.Title, _spec.Topic, _spec.TargetAudience, fullToc, node, parentSummary, _config.NodeDetailWords);
             node.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
             _logger.LogInformation("Contenido recibido nodo {Number} (len={Len}) – guardando", node.Number, node.Content?.Length ?? 0);
             await _writer.SaveAsync(_spec);
@@ -348,58 +363,83 @@ public class BookGenerator : IBookFlowOrchestrator
 
     private async Task GenerateChapterAndSubchapterContent()
     {
-        // Recorre capítulos principales: genera contenido del capítulo y luego el de sus subcapítulos hoja
-        for (int i = 0; i < _spec.TableOfContents.Count; i++)
+        // Recorre todo el árbol: overview si el nodo tiene hijos; detalle si es hoja
+        await GenerateNodeContentRecursive(_spec.TableOfContents, parent: null);
+    }
+
+    private async Task GenerateNodeContentRecursive(List<ChapterNode> nodes, ChapterNode? parent)
+    {
+        for (int i = 0; i < nodes.Count; i++)
         {
-            var chapter = _spec.TableOfContents[i];
+            var node = nodes[i];
+            _ui.WriteLine($"\n>>> Generando contenido para {node.Number} {node.Title} …", ConsoleColor.Cyan);
+            _logger.LogInformation("LLM Content prompt para nodo {Number}: '{Title}'", node.Number, node.Title);
 
-            // 1) Generar contenido del capítulo principal (aunque tenga subcapítulos)
-            string parentSummary = "(ninguno)";
-            _ui.WriteLine($"\n>>> Generando contenido para {chapter.Number} {chapter.Title} …", ConsoleColor.Cyan);
-            _logger.LogInformation("LLM Content prompt para capítulo {Number}: '{Title}'", chapter.Number, chapter.Title);
-            var chapterPrompt = PromptBuilder.GetChapterPrompt(
-                _spec.Title,
-                _spec.Topic,
-                _spec.TargetAudience,
-                BuildTocString(),
-                chapter,
-                parentSummary,
-                _config.TargetWordsPerChapter);
-            chapter.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, chapterPrompt, _config.Model, _config.MaxTokensPerCall);
-            _logger.LogInformation("Contenido recibido capítulo {Number} (len={Len}) – guardando", chapter.Number, chapter.Content?.Length ?? 0);
-            await _writer.SaveAsync(_spec);
-
-            // 2) Generar contenido para subcapítulos hoja
-            if (chapter.SubChapters.Any())
+            if (node.SubChapters.Any())
             {
-                // Resumen del capítulo principal anterior (para continuidad entre capítulos)
-                string prevMainSummary = "(ninguno)";
-                if (i - 1 >= 0)
+                var prevSummary = parent?.Summary ?? "(ninguno)";
+                var overviewPrompt = PromptBuilder.GetChapterOverviewPrompt(
+                    _spec.Title,
+                    _spec.Topic,
+                    _spec.TargetAudience,
+                    node,
+                    prevSummary,
+                    _config.NodeSummaryWords);
+                node.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, overviewPrompt, _config.Model, _config.MaxTokensPerCall);
+                if (IsOverviewWeak(node.Content, node))
                 {
-                    var prev = _spec.TableOfContents[i - 1];
-                    prevMainSummary = prev.Summary ?? "(ninguno)";
+                    var strictPrompt = overviewPrompt + "\n\nInstrucción final: escribe 3 párrafos (80-120 palabras cada uno), sin listas, sin encabezados ni numeraciones de secciones.";
+                    _logger.LogInformation("Overview débil para nodo {Number}; reintentando con prompt estricto", node.Number);
+                    node.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, strictPrompt, _config.Model, _config.MaxTokensPerCall);
                 }
-
-                foreach (var sc in chapter.SubChapters)
+                _logger.LogInformation("Contenido recibido nodo {Number} (len={Len}) – guardando", node.Number, node.Content?.Length ?? 0);
+                await _writer.SaveAsync(_spec);
+                await GenerateNodeContentRecursive(node.SubChapters, node);
+            }
+            else
+            {
+                var parentSummary = parent?.Summary ?? "(ninguno)";
+                var prompt = PromptBuilder.GetChapterPrompt(
+                    _spec.Title,
+                    _spec.Topic,
+                    _spec.TargetAudience,
+                    BuildTocString(),
+                    node,
+                    parentSummary,
+                    _config.NodeDetailWords);
+                node.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
+                if (string.IsNullOrWhiteSpace(node.Content))
                 {
-                    if (sc.SubChapters.Any()) continue; // solo hojas
-
-                    _ui.WriteLine($"\n>>> Generando contenido para {sc.Number} {sc.Title} …", ConsoleColor.Cyan);
-                    _logger.LogInformation("LLM Content prompt para subcapítulo {Number}: '{Title}'", sc.Number, sc.Title);
-                    var prompt = PromptBuilder.GetSubchapterContentPrompt(
-                        _spec.Title,
-                        _spec.Topic,
-                        _spec.TargetAudience,
-                        sc,
-                        chapter,
-                        prevMainSummary,
-                        _config.TargetWordsPerChapter);
-                    sc.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
-                    _logger.LogInformation("Contenido recibido subcapítulo {Number} (len={Len}) – guardando", sc.Number, sc.Content?.Length ?? 0);
-                    await _writer.SaveAsync(_spec);
+                    _ui.WriteLine($"[ERROR] El LLM devolvió contenido vacío para la sección {node.Number} {node.Title}.", ConsoleColor.Red);
+                    _logger.LogError("Contenido vacío en hoja {Number} — '{Title}'", node.Number, node.Title);
+                    throw new InvalidOperationException($"LLM devolvió contenido vacío para la sección {node.Number} {node.Title}.");
                 }
+                _logger.LogInformation("Contenido recibido nodo {Number} (len={Len}) – guardando", node.Number, node.Content?.Length ?? 0);
+                await _writer.SaveAsync(_spec);
             }
         }
+    }
+
+    private bool IsOverviewWeak(string? content, ChapterNode chapter)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return true;
+        var text = content.Replace("\r\n", "\n");
+        // Filtrar líneas que son rótulos de subcapítulos
+        var sb = new StringBuilder();
+        foreach (var line in text.Split('\n'))
+        {
+            bool isLabel = false;
+            foreach (var sc in chapter.SubChapters)
+            {
+                if (System.Text.RegularExpressions.Regex.IsMatch(line, $@"^\s*{System.Text.RegularExpressions.Regex.Escape(sc.Number)}\s+{System.Text.RegularExpressions.Regex.Escape(sc.Title)}\s*$"))
+                { isLabel = true; break; }
+                if (System.Text.RegularExpressions.Regex.IsMatch(line, $@"^\s*####\s+{System.Text.RegularExpressions.Regex.Escape(sc.Number)}\s+{System.Text.RegularExpressions.Regex.Escape(sc.Title)}\s*$"))
+                { isLabel = true; break; }
+            }
+            if (!isLabel) sb.AppendLine(line);
+        }
+        var cleaned = sb.ToString().Trim();
+        return cleaned.Length < 60; // demasiado corto para ser una sinopsis útil
     }
 
     private string BuildTocString()

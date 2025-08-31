@@ -19,7 +19,14 @@ public class OpenAiResponsesLlmClient : ILlmClient
         _config = config;
         _ui = ui;
         _logger = logger;
-        _http = new HttpClient { Timeout = config.HttpTimeout };
+        // Use HttpClientHandler with cookies disabled to avoid CookieContainer initialization issues
+        var handler = new HttpClientHandler
+        {
+            UseCookies = false,
+            AllowAutoRedirect = true,
+            AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+        };
+        _http = new HttpClient(handler) { Timeout = config.HttpTimeout };
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         if (string.IsNullOrEmpty(apiKey)) throw new InvalidOperationException("OPENAI_API_KEY not set");
         _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
@@ -31,6 +38,7 @@ public class OpenAiResponsesLlmClient : ILlmClient
         try
         {
             var inputArray = new JsonArray();
+            bool isOverview = user.StartsWith("Redacta el contenido del capítulo", StringComparison.OrdinalIgnoreCase);
 
             // 1) System (cacheable opcional)
             var systemContent = new JsonArray
@@ -72,7 +80,8 @@ public class OpenAiResponsesLlmClient : ILlmClient
             {
                 ["model"] = model,
                 ["input"] = inputArray,
-                ["max_output_tokens"] = maxTokens
+                ["max_output_tokens"] = maxTokens,
+                ["temperature"] = isOverview ? 0.3 : 0.7
             };
 
             if (_config.ResponsesStrictJson && !string.IsNullOrWhiteSpace(jsonSchema))

@@ -17,9 +17,15 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
     {
         var fullManuscript = new StringBuilder();
         
-        // 1. Metadata
+        // 1. Portada y metadatos
         fullManuscript.AppendLine($"# {spec.Title}");
         fullManuscript.AppendLine();
+        // Resumen del manual (overview del nodo raíz)
+        if (!string.IsNullOrWhiteSpace(spec.ManualSummary))
+        {
+            fullManuscript.AppendLine(spec.ManualSummary.Trim());
+            fullManuscript.AppendLine();
+        }
         fullManuscript.AppendLine($"**Público Objetivo:** {spec.TargetAudience}");
         fullManuscript.AppendLine($"**Tema:** {spec.Topic}");
         fullManuscript.AppendLine();
@@ -47,18 +53,28 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         fullManuscript.AppendLine();
         AppendContent(fullManuscript, spec.TableOfContents, 1);
 
-        await System.IO.File.WriteAllTextAsync("manuscrito.md", fullManuscript.ToString(), Encoding.UTF8);
-        _logger.LogInformation("Archivo manuscrito.md actualizado");
+        // Guardado: sólo cuando final==true; si no, no escribimos a disco
+        if (!final)
+        {
+            _logger.LogInformation("[Preview] Se omitió escritura de manuscrito.md (no final)");
+            return;
+        }
+        try
+        {
+            // Borrar copias antiguas en raíz si existen
+            if (System.IO.File.Exists("manuscrito.md")) System.IO.File.Delete("manuscrito.md");
+        }
+        catch { }
         try
         {
             if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
             {
                 var backPath = System.IO.Path.Combine(RunContext.BackRunDirectory, "manuscrito.md");
                 await System.IO.File.WriteAllTextAsync(backPath, fullManuscript.ToString(), Encoding.UTF8);
-                _logger.LogInformation("Copia en back: {Path}", backPath);
+                _logger.LogInformation("Archivo manuscrito.md guardado en back: {Path}", backPath);
             }
         }
-        catch (Exception ex) { _logger.LogWarning(ex, "No se pudo copiar manuscrito.md al directorio back"); }
+        catch (Exception ex) { _logger.LogWarning(ex, "No se pudo escribir manuscrito.md en back"); }
 
         if (final)
         {
@@ -67,18 +83,22 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             onlyChapters.AppendLine($"# {spec.Title}");
             onlyChapters.AppendLine();
             AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: true);
-            await System.IO.File.WriteAllTextAsync("manuscrito_capitulos.md", onlyChapters.ToString(), Encoding.UTF8);
-            _logger.LogInformation("Archivo manuscrito_capitulos.md actualizado (final)");
+            try
+            {
+                // Borrar copias antiguas en raíz si existen
+                if (System.IO.File.Exists("manuscrito_capitulos.md")) System.IO.File.Delete("manuscrito_capitulos.md");
+            }
+            catch { }
             try
             {
                 if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
                 {
                     var backPath2 = System.IO.Path.Combine(RunContext.BackRunDirectory, "manuscrito_capitulos.md");
                     await System.IO.File.WriteAllTextAsync(backPath2, onlyChapters.ToString(), Encoding.UTF8);
-                    _logger.LogInformation("Copia en back: {Path}", backPath2);
+                    _logger.LogInformation("Archivo manuscrito_capitulos.md guardado en back: {Path}", backPath2);
                 }
             }
-            catch (Exception ex) { _logger.LogWarning(ex, "No se pudo copiar manuscrito_capitulos.md al directorio back"); }
+            catch (Exception ex) { _logger.LogWarning(ex, "No se pudo escribir manuscrito_capitulos.md en back"); }
         }
     }
 
@@ -129,6 +149,16 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             content = SanitizeInternalHeadings(content, node.Number, node.Title);
             // Asegurar separación entre líneas que terminan en ':' y la siguiente que inicia con backticks
             content = FixColonBacktickSpacing(content);
+            // Si es un capítulo con subcapítulos, impedir que el overview duplique rótulos de subcapítulos
+            if (level == 1 && node.SubChapters.Any())
+            {
+                content = StripSubchapterLabelLines(content, node);
+                var trimmed = content.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed) || trimmed.Length < 60)
+                {
+                    content = ComposeChapterOverviewFallback(node);
+                }
+            }
             sb.AppendLine(content);
             sb.AppendLine();
 
@@ -175,6 +205,66 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
 
         return result.ToString().TrimEnd('\n');
     }
+    private static string StripSubchapterLabelLines(string content, ChapterNode chapter)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var result = new StringBuilder(content.Length);
+        foreach (var raw in lines)
+        {
+            var line = raw;
+            bool isLabel = false;
+            foreach (var sc in chapter.SubChapters)
+            {
+                var patternPlain = $@"^\s*{System.Text.RegularExpressions.Regex.Escape(sc.Number)}\s+{System.Text.RegularExpressions.Regex.Escape(sc.Title)}\s*$";
+                var patternH4 = $@"^\s*####\s+{System.Text.RegularExpressions.Regex.Escape(sc.Number)}\s+{System.Text.RegularExpressions.Regex.Escape(sc.Title)}\s*$";
+                if (System.Text.RegularExpressions.Regex.IsMatch(line, patternPlain) ||
+                    System.Text.RegularExpressions.Regex.IsMatch(line, patternH4))
+                {
+                    isLabel = true;
+                    break;
+                }
+            }
+            if (!isLabel) result.AppendLine(line);
+        }
+        return result.ToString().TrimEnd('\n');
+    }
+
+    private static string ComposeChapterOverviewFallback(ChapterNode chapter)
+    {
+        var sb = new StringBuilder();
+        if (!string.IsNullOrWhiteSpace(chapter.Summary))
+        {
+            sb.AppendLine(chapter.Summary.Trim());
+            sb.AppendLine();
+        }
+        else
+        {
+            sb.AppendLine($"Este capítulo, \"{chapter.Title}\", ofrece una visión general de los temas clave y prepara el terreno para los apartados siguientes.");
+            sb.AppendLine();
+        }
+
+        if (chapter.SubChapters.Any())
+        {
+            var titles = chapter.SubChapters.Select(sc => sc.Title.Trim()).Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+            if (titles.Count > 0)
+            {
+                string listado = titles.Count switch
+                {
+                    1 => titles[0],
+                    2 => $"{titles[0]} y {titles[1]}",
+                    _ => string.Join(", ", titles.Take(titles.Count - 1)) + $" y {titles.Last()}"
+                };
+                sb.AppendLine($"En particular, se abordan aspectos como {listado}, ofreciendo un hilo conductor que permite entender cómo encajan entre sí.");
+                sb.AppendLine();
+            }
+        }
+
+        sb.AppendLine("Al finalizar, el lector contará con un mapa conceptual claro del capítulo y sabrá qué esperar en los apartados posteriores.");
+        return sb.ToString().Trim();
+    }
+
+    
 
     private static string FixColonBacktickSpacing(string content)
     {

@@ -56,6 +56,15 @@ public class OpenAiSdkLlmClient : ILlmClient
                 {
                     prop.SetValue(options, maxTokens);
                 }
+                // Bajar la temperatura para overviews de capítulo (best-effort via reflexión)
+                if (user.StartsWith("Redacta el contenido del capítulo", StringComparison.OrdinalIgnoreCase))
+                {
+                    var tempProp = options.GetType().GetProperty("Temperature");
+                    if (tempProp != null && tempProp.CanWrite)
+                    {
+                        tempProp.SetValue(options, 0.3);
+                    }
+                }
                 completion = await _client.CompleteChatAsync(messages, options);
             }
             catch

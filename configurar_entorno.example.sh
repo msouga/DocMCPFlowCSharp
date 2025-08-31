@@ -38,7 +38,12 @@ export TREAT_REFUSAL_AS_ERROR="${TREAT_REFUSAL_AS_ERROR:-true}"
 # Modo demo para limitar el índice (2 capítulos × 2 subcapítulos).
 export DEMO_MODE="${DEMO_MODE:-true}"
 
-# Límite de llamadas a IA para generar contenido (por defecto 8).
+# Longitud objetivo por subcapítulo (0 = ilimitado)
+# Longitud objetivo por nodo hoja (0 = ilimitado)
+export NODE_DETAIL_WORDS="${NODE_DETAIL_WORDS:-0}"
+
+# Longitud objetivo del overview (solo nodos con hijos)
+export NODE_SUMMARY_WORDS="${NODE_SUMMARY_WORDS:-180}"
 
 # Nivel de logging (si DEBUG=true incluye Info y Debug; si false solo Warning y Error)
 export DEBUG="${DEBUG:-true}"

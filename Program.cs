@@ -25,6 +25,11 @@ internal class Program
             System.IO.Directory.CreateDirectory(runDir);
             RunContext.BackRunDirectory = runDir;
             RunContext.RootLogPath = rootLogPath;
+            // Higiene: eliminar manuscritos previos en raíz si existen
+            var rootManuscript = System.IO.Path.Combine(Environment.CurrentDirectory, "manuscrito.md");
+            var rootChapters = System.IO.Path.Combine(Environment.CurrentDirectory, "manuscrito_capitulos.md");
+            if (System.IO.File.Exists(rootManuscript)) System.IO.File.Delete(rootManuscript);
+            if (System.IO.File.Exists(rootChapters)) System.IO.File.Delete(rootChapters);
             // Construir ILogger (consola + archivo back + archivo root)
             var minLevel = config.DebugLogging ? LogLevel.Debug : LogLevel.Warning;
             using var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>

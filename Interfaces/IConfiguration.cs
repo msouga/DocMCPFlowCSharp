@@ -7,7 +7,8 @@ public interface IConfiguration
     string OpenApiKey { get; }
     string Model { get; }
     int MaxTokensPerCall { get; }
-    int TargetWordsPerChapter { get; }
+    int NodeDetailWords { get; }
+    int NodeSummaryWords { get; }
     int PrevChapterTailChars { get; }
     TimeSpan HttpTimeout { get; }
     bool TreatRefusalAsError { get; }
