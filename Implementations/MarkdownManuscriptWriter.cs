@@ -3,9 +3,16 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 
 public class MarkdownManuscriptWriter : IManuscriptWriter
 {
+    private readonly ILogger<MarkdownManuscriptWriter> _logger;
+
+    public MarkdownManuscriptWriter(ILogger<MarkdownManuscriptWriter> logger)
+    {
+        _logger = logger;
+    }
     public async Task SaveAsync(BookSpecification spec, bool final = false)
     {
         var fullManuscript = new StringBuilder();
@@ -41,14 +48,14 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         AppendContent(fullManuscript, spec.TableOfContents, 1);
 
         await System.IO.File.WriteAllTextAsync("manuscrito.md", fullManuscript.ToString(), Encoding.UTF8);
-        Logger.Append("Archivo manuscrito.md actualizado");
+        _logger.LogInformation("Archivo manuscrito.md actualizado");
         try
         {
-            if (!string.IsNullOrEmpty(Logger.RunDirectory))
+            if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
             {
-                var backPath = System.IO.Path.Combine(Logger.RunDirectory, "manuscrito.md");
+                var backPath = System.IO.Path.Combine(RunContext.BackRunDirectory, "manuscrito.md");
                 await System.IO.File.WriteAllTextAsync(backPath, fullManuscript.ToString(), Encoding.UTF8);
-                Logger.Append($"Copia en back: {backPath}");
+                _logger.LogInformation("Copia en back: {Path}", backPath);
             }
         }
         catch { /* no interrumpir el flujo por copia fallida */ }
@@ -61,14 +68,14 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             onlyChapters.AppendLine();
             AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: true);
             await System.IO.File.WriteAllTextAsync("manuscrito_capitulos.md", onlyChapters.ToString(), Encoding.UTF8);
-            Logger.Append("Archivo manuscrito_capitulos.md actualizado (final)");
+            _logger.LogInformation("Archivo manuscrito_capitulos.md actualizado (final)");
             try
             {
-                if (!string.IsNullOrEmpty(Logger.RunDirectory))
+                if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
                 {
-                    var backPath2 = System.IO.Path.Combine(Logger.RunDirectory, "manuscrito_capitulos.md");
+                    var backPath2 = System.IO.Path.Combine(RunContext.BackRunDirectory, "manuscrito_capitulos.md");
                     await System.IO.File.WriteAllTextAsync(backPath2, onlyChapters.ToString(), Encoding.UTF8);
-                    Logger.Append($"Copia en back: {backPath2}");
+                    _logger.LogInformation("Copia en back: {Path}", backPath2);
                 }
             }
             catch { }

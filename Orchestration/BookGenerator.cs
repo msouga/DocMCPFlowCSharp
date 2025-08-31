@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 public class BookGenerator : IBookFlowOrchestrator
 {
@@ -12,32 +13,34 @@ public class BookGenerator : IBookFlowOrchestrator
     private readonly ILlmClient _llm;
     private readonly IManuscriptWriter _writer;
     private readonly BookSpecification _spec = new();
+    private readonly ILogger<BookGenerator> _logger;
 
-    public BookGenerator(IConfiguration config, IUserInteraction ui, ILlmClient llm, IManuscriptWriter writer)
+    public BookGenerator(IConfiguration config, IUserInteraction ui, ILlmClient llm, IManuscriptWriter writer, ILogger<BookGenerator> logger)
     {
         _config = config;
         _ui = ui;
         _llm = llm;
         _writer = writer;
+        _logger = logger;
     }
 
     public async Task RunAsync()
     {
         CollectInitialInputs();
-        Logger.Append($"Entradas iniciales — Título: '{_spec.Title}', Público: '{_spec.TargetAudience}', Tema: '{_spec.Topic}'");
+        _logger.LogInformation("Entradas iniciales — Título: '{Title}', Público: '{Audience}', Tema: '{Topic}'", _spec.Title, _spec.TargetAudience, _spec.Topic);
         await GenerateTableOfContents();
         DisplayAndEditTableOfContents();
-        Logger.Append("Índice finalizado por el usuario");
+        _logger.LogInformation("Índice finalizado por el usuario");
         NumberNodes(_spec.TableOfContents, "");
 
         await GenerateIntroduction();
-        Logger.Append($"Introducción generada (len={_spec.Introduction?.Length ?? 0})");
+        _logger.LogInformation("Introducción generada (len={Len})", _spec.Introduction?.Length ?? 0);
 
         _ui.WriteLine("\n[Proceso] Generando resúmenes para la estructura final...", ConsoleColor.Green);
         await GenerateSummaries();
         DisplaySummaries();
         await _writer.SaveAsync(_spec);
-        Logger.Append("Guardado de manuscrito luego de resúmenes");
+        _logger.LogInformation("Guardado de manuscrito luego de resúmenes");
 
         if (_config.IsDryRun)
         {
@@ -46,10 +49,10 @@ public class BookGenerator : IBookFlowOrchestrator
         }
 
         _ui.WriteLine("\n[Proceso] Generando contenido completo del documento...", ConsoleColor.Green);
-        Logger.Append($"Límite de llamadas de contenido: {_config.ContentCallsLimit}");
+        _logger.LogInformation("Límite de llamadas de contenido: {Limit}", _config.ContentCallsLimit);
         await GenerateContentForLeaves();
         await _writer.SaveAsync(_spec, final: true);
-        Logger.Append("Guardado final de manuscrito (contenido completo)");
+        _logger.LogInformation("Guardado final de manuscrito (contenido completo)");
         
         _ui.WriteLine("\nListo. Archivo generado: manuscrito.md\n", ConsoleColor.Green);
     }
@@ -75,7 +78,7 @@ public class BookGenerator : IBookFlowOrchestrator
         {
             _ui.WriteLine("\n[Demo] Modo demo activo: usando índice mínimo (2 capítulos × 2 subcapítulos).", ConsoleColor.Yellow);
             _spec.TableOfContents = BuildDemoToc();
-            Logger.Append("DemoMode: TOC demo 2x2 construido");
+            _logger.LogInformation("DemoMode: TOC demo 2x2 construido");
             return;
         }
 
@@ -87,13 +90,13 @@ public class BookGenerator : IBookFlowOrchestrator
         try
         {
             _spec.TableOfContents = ParseToc(jsonResponse);
-            Logger.Append($"TOC generado por LLM (nodos raíz={_spec.TableOfContents.Count})");
+            _logger.LogInformation("TOC generado por LLM (nodos raíz={Count})", _spec.TableOfContents.Count);
         }
         catch (JsonException ex)
         {
             _ui.WriteLine($"Error al procesar la estructura JSON: {ex.Message}", ConsoleColor.Red);
             _ui.WriteLine("No se pudo generar una estructura. Saliendo.", ConsoleColor.Red);
-            Logger.Append($"Error al parsear TOC JSON: {ex.Message}");
+            _logger.LogError(ex, "Error al parsear TOC JSON: {Message}", ex.Message);
             Environment.Exit(1);
         }
     }
@@ -251,7 +254,7 @@ public class BookGenerator : IBookFlowOrchestrator
         {
             _ui.WriteLine($"- Generando resúmenes para el bloque del capítulo {chapter.Number} {chapter.Title} ...", ConsoleColor.DarkGray);
             var prompt = PromptBuilder.GetSummariesForChapterBlockPrompt(_spec.Title, _spec.TargetAudience, chapter, previousSummary);
-            Logger.Append($"LLM Summaries prompt para capítulo {chapter.Number}: '{chapter.Title}'");
+            _logger.LogInformation("LLM Summaries prompt para capítulo {Number}: '{Title}'", chapter.Number, chapter.Title);
             
             var summariesJson = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall, jsonSchema: "{{}}"); // Request JSON output
 
@@ -268,12 +271,12 @@ public class BookGenerator : IBookFlowOrchestrator
                         count++;
                     }
                 }
-                Logger.Append($"Resúmenes actualizados para capítulo {chapter.Number}: {count} nodos");
+                _logger.LogInformation("Resúmenes actualizados para capítulo {Number}: {Count} nodos", chapter.Number, count);
             }
             catch (JsonException ex)
             {
                 _ui.WriteLine($"Error al procesar resúmenes JSON para el capítulo {chapter.Number}: {ex.Message}.", ConsoleColor.Yellow);
-                Logger.Append($"Error al parsear resúmenes capítulo {chapter.Number}: {ex.Message}");
+                _logger.LogError(ex, "Error al parsear resúmenes capítulo {Number}: {Message}", chapter.Number, ex.Message);
             }
 
             previousSummary = chapter.Summary;
@@ -316,10 +319,10 @@ public class BookGenerator : IBookFlowOrchestrator
             }
 
             _ui.WriteLine($"\n>>> Generando contenido para {node.Number} {node.Title} …", ConsoleColor.Cyan);
-            Logger.Append($"LLM Content prompt para nodo {node.Number}: '{node.Title}'");
+            _logger.LogInformation("LLM Content prompt para nodo {Number}: '{Title}'", node.Number, node.Title);
             var prompt = PromptBuilder.GetChapterPrompt(_spec.Title, _spec.Topic, _spec.TargetAudience, fullToc, node, parentSummary, _config.TargetWordsPerChapter);
             node.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
-            Logger.Append($"Contenido recibido nodo {node.Number} (len={node.Content?.Length ?? 0}) – guardando");
+            _logger.LogInformation("Contenido recibido nodo {Number} (len={Len}) – guardando", node.Number, node.Content?.Length ?? 0);
             await _writer.SaveAsync(_spec);
 
             if (node.SubChapters.Any())
@@ -339,7 +342,7 @@ public class BookGenerator : IBookFlowOrchestrator
             if (_contentCalls >= _config.ContentCallsLimit)
             {
                 _ui.WriteLine($"\n[Límite] Se alcanzó el máximo de {_config.ContentCallsLimit} llamadas a IA para contenido.", ConsoleColor.Yellow);
-                Logger.Append($"Límite de {_config.ContentCallsLimit} llamadas de contenido alcanzado; deteniendo generación adicional");
+                _logger.LogInformation("Límite de {Limit} llamadas de contenido alcanzado; deteniendo generación adicional", _config.ContentCallsLimit);
                 break;
             }
 
@@ -359,7 +362,7 @@ public class BookGenerator : IBookFlowOrchestrator
             }
 
             _ui.WriteLine($"\n>>> Generando contenido para {leaf.Number} {leaf.Title} …", ConsoleColor.Cyan);
-            Logger.Append($"LLM Content prompt para subcapítulo {leaf.Number}: '{leaf.Title}'");
+            _logger.LogInformation("LLM Content prompt para subcapítulo {Number}: '{Title}'", leaf.Number, leaf.Title);
 
             var prompt = PromptBuilder.GetSubchapterContentPrompt(
                 _spec.Title,
@@ -372,7 +375,7 @@ public class BookGenerator : IBookFlowOrchestrator
 
             leaf.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
             _contentCalls++;
-            Logger.Append($"Contenido recibido subcapítulo {leaf.Number} (len={leaf.Content?.Length ?? 0}) – guardando");
+            _logger.LogInformation("Contenido recibido subcapítulo {Number} (len={Len}) – guardando", leaf.Number, leaf.Content?.Length ?? 0);
             await _writer.SaveAsync(_spec);
         }
     }

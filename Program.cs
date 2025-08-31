@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 internal class Program
 {
@@ -17,40 +18,48 @@ internal class Program
 
         var runId = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss");
         var runDir = System.IO.Path.Combine("back", runId);
-        var logFilePath = System.IO.Path.Combine(runDir, $"{runId}-log.txt");
+        var backLogPath = System.IO.Path.Combine(runDir, $"{runId}-log.txt");
+        var rootLogPath = System.IO.Path.Combine(Environment.CurrentDirectory, "ultimo-log.txt");
         try
         {
             System.IO.Directory.CreateDirectory(runDir);
-            await System.IO.File.WriteAllTextAsync(logFilePath, $"# Log de sesión — {DateTime.Now:O}\n\n");
-            Logger.Init(logFilePath);
-            Logger.Append("Inicio de sesión y preparación de entorno");
+            RunContext.BackRunDirectory = runDir;
+            RunContext.RootLogPath = rootLogPath;
+            // Construir ILogger (consola + archivo back + archivo root)
+            using var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
+            {
+                builder.AddConsole();
+                builder.AddProvider(new FileLoggerProvider(backLogPath, rootLogPath));
+            });
+            var log = loggerFactory.CreateLogger<Program>();
+            log.LogInformation($"Inicio de sesión — {DateTime.Now:O}");
+
+            var llmClient = new OpenAiSdkLlmClient(config, ui, loggerFactory.CreateLogger<OpenAiSdkLlmClient>());
+            var manuscriptWriter = new MarkdownManuscriptWriter(loggerFactory.CreateLogger<MarkdownManuscriptWriter>());
+            
+            var orchestrator = new BookGenerator(config, ui, llmClient, manuscriptWriter, loggerFactory.CreateLogger<BookGenerator>());
+
+            var flowSw = Stopwatch.StartNew();
+            try
+            {
+                log.LogInformation("Arrancando orquestador de flujo (BookGenerator.RunAsync)");
+                await orchestrator.RunAsync();
+                log.LogInformation("Ejecución de orquestador completada");
+            }
+            catch (Exception ex)
+            {
+                ui.WriteLine($"\n[ERROR FATAL] {ex.Message}", ConsoleColor.Red);
+                ui.WriteLine(ex.ToString(), ConsoleColor.DarkRed);
+                log.LogError(ex, "ERROR FATAL en ejecución");
+            }
+            finally
+            {
+                flowSw.Stop();
+                llmClient.PrintUsage();
+                ui.WriteLine($"Tiempo total: {flowSw.Elapsed}", ConsoleColor.Magenta);
+                log.LogInformation($"Tiempo total: {flowSw.Elapsed}");
+            }
         }
         catch { /* si no se puede escribir, seguimos sin romper */ }
-
-        var llmClient = new OpenAiSdkLlmClient(config, ui);
-        var manuscriptWriter = new MarkdownManuscriptWriter();
-        
-        var orchestrator = new BookGenerator(config, ui, llmClient, manuscriptWriter);
-
-        var flowSw = Stopwatch.StartNew();
-        try
-        {
-            Logger.Append("Arrancando orquestador de flujo (BookGenerator.RunAsync)");
-            await orchestrator.RunAsync();
-            Logger.Append("Ejecución de orquestador completada");
-        }
-        catch (Exception ex)
-        {
-            ui.WriteLine($"\n[ERROR FATAL] {ex.Message}", ConsoleColor.Red);
-            ui.WriteLine(ex.ToString(), ConsoleColor.DarkRed);
-            Logger.Append($"ERROR FATAL: {ex}");
-        }
-        finally
-        {
-            flowSw.Stop();
-            llmClient.PrintUsage();
-            ui.WriteLine($"Tiempo total: {flowSw.Elapsed}", ConsoleColor.Magenta);
-            Logger.Append($"Tiempo total: {flowSw.Elapsed}");
-        }
     }
 }
