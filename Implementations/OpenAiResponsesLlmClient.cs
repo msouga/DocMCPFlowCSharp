@@ -35,6 +35,11 @@ public class OpenAiResponsesLlmClient : ILlmClient
         {
             try { _http.DefaultRequestHeaders.Add("OpenAI-Beta", betaHeader!); } catch { }
         }
+        else if (config.EnableWebSearch)
+        {
+            // Aviso amistoso: algunos despliegues requieren este header para tools
+            _ui.WriteLine("[Aviso] ENABLE_WEB_SEARCH=true sin OPENAI_BETA_HEADER; si ves errores de herramientas, define OPENAI_BETA_HEADER.", ConsoleColor.DarkYellow);
+        }
     }
 
     public async Task<string> AskAsync(string system, string user, string model, int maxTokens, string? jsonSchema = null)
@@ -44,6 +49,12 @@ public class OpenAiResponsesLlmClient : ILlmClient
         {
             var inputArray = new JsonArray();
             bool isOverview = user.StartsWith("Redacta el contenido del capítulo", StringComparison.OrdinalIgnoreCase);
+            bool enableWeb = _config.EnableWebSearch;
+            if (enableWeb && !isOverview)
+            {
+                // Incluir instrucción para citar fuentes cuando proceda
+                user += "\n\nSi falta contexto, realiza búsquedas web cuando sea útil y cita 3–5 fuentes relevantes con URL en una sección 'Fuentes' al final.";
+            }
 
             // 1) System (cacheable opcional)
             var systemContent = new JsonArray
@@ -85,12 +96,11 @@ public class OpenAiResponsesLlmClient : ILlmClient
             {
                 ["model"] = model,
                 ["input"] = inputArray,
-                ["max_output_tokens"] = maxTokens,
-                ["temperature"] = isOverview ? 0.3 : 0.7
+                ["max_output_tokens"] = maxTokens
             };
 
             // Si está habilitada la búsqueda web, añadimos la herramienta oficial
-            if (_config.EnableWebSearch)
+            if (enableWeb)
             {
                 var tools = new JsonArray
                 {
@@ -98,12 +108,6 @@ public class OpenAiResponsesLlmClient : ILlmClient
                 };
                 root["tools"] = tools;
                 root["tool_choice"] = "auto";
-
-                // Para nodos de contenido (no overview), incentivamos citar fuentes
-                if (!isOverview)
-                {
-                    user += "\n\nSi falta contexto, realiza búsquedas web cuando sea útil y cita 3–5 fuentes relevantes con URL en una sección 'Fuentes' al final.";
-                }
             }
 
             if (_config.ResponsesStrictJson && !string.IsNullOrWhiteSpace(jsonSchema))
@@ -198,6 +202,21 @@ public class OpenAiResponsesLlmClient : ILlmClient
                         return string.Empty;
                     }
                     body = body3;
+                }
+                else if ((int)resp.StatusCode == 400 && body.Contains("temperature", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Robustez por si alguna variante incluye 'temperature'
+                    _logger.LogInformation("Responses API rechazó 'temperature'; reintentando sin ese parámetro");
+                    try { root.Remove("temperature"); } catch { }
+                    var payload4 = root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+                    var resp4 = await _http.PostAsync("https://api.openai.com/v1/responses", new StringContent(payload4, Encoding.UTF8, "application/json"));
+                    var body4 = await resp4.Content.ReadAsStringAsync();
+                    if (!resp4.IsSuccessStatusCode)
+                    {
+                        _logger.LogError("Responses API error (retry-3): {Status} {Body}", resp4.StatusCode, body4);
+                        return string.Empty;
+                    }
+                    body = body4;
                 }
                 else
                 {
