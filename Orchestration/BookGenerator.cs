@@ -679,12 +679,12 @@ public class BookGenerator : IBookFlowOrchestrator
     private async Task GenerateAndSaveDiagramSuggestions()
     {
         _ui.WriteLine("\n[Proceso] Proponiendo diagramas para el manual...", ConsoleColor.Green);
-        var sections = new List<(string num, string title, string summary)>();
+        var sections = new List<(string num, string title, string summary, string content)>();
         void Collect(List<ChapterNode> nodes)
         {
             foreach (var n in nodes)
             {
-                sections.Add((n.Number, n.Title, n.Summary ?? string.Empty));
+                sections.Add((n.Number, n.Title, n.Summary ?? string.Empty, n.Content ?? string.Empty));
                 if (n.SubChapters.Any()) Collect(n.SubChapters);
             }
         }

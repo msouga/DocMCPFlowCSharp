@@ -251,34 +251,36 @@ Requisitos:
         return payload.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value);
     }
 
-    // Sugerencias de diagramas: prioriza PlantUML; si no aplica, usa Mermaid.
+    // Sugerencias de diagramas: prioriza PlantUML; si no aplica, usa Mermaid. Usa contenido real para decidir.
     private const string DiagramSuggestionsPromptTemplate = @"Eres un asistente que propone gráficos técnicos para un manual.
 Genera una lista de diagramas útiles para ilustrar conceptos clave del documento.
 
 Instrucciones:
 - Prioriza formatos con código: PlantUML preferido; si no aplica, usa Mermaid. Si ninguno aplica, describe textualmente.
-- Por cada sección relevante, sugiere 0–3 diagramas. No fuerces diagramas innecesarios.
+- Revisa el contenido real de cada sección (extractos incluidos). Sugiere 0–3 diagramas SOLO cuando aporten claridad; no propongas nada si no agrega valor.
 - Indica: Sección (número y título), Nombre del diagrama, Objetivo, Ubicación sugerida (antes/después de qué párrafo o al final de la sección), Formato (plantuml/mermaid/texto), y el bloque de código (si aplica).
-- Evita repetir el contenido del manual. Sé específico.
+- Evita repetir o reescribir el contenido; enfócate en qué graficar y cómo.
 
 Contexto del documento:
 - Título: ""{title}""
 - Tema: {topic}
 - Público: {audience}
-- Estructura con resúmenes:
+- Secciones (con extractos):
 {sectionSummaries}
 
 Entrega en Markdown. Ordena por número de sección. Usa bloques de código etiquetados (```plantuml o ```mermaid) cuando proporciones código.";
 
-    public static string GetDiagramSuggestionsPrompt(string title, string topic, string audience, IEnumerable<(string num, string title, string summary)> sections)
+    public static string GetDiagramSuggestionsPrompt(string title, string topic, string audience, IEnumerable<(string num, string title, string summary, string content)> sections)
     {
         var sb = new StringBuilder();
-        foreach (var (num, t, sum) in sections)
+        foreach (var (num, t, sum, content) in sections)
         {
             var s = string.IsNullOrWhiteSpace(sum) ? "(sin resumen)" : sum.Trim();
-            // Limitar cada resumen para no exceder tokens
-            if (s.Length > 400) s = s.Substring(0, 400) + "…";
-            sb.AppendLine($"- {num} {t}: {s}");
+            var c = string.IsNullOrWhiteSpace(content) ? "(sin contenido)" : content.Trim();
+            // Limitar extractos por sección para no exceder tokens
+            if (s.Length > 300) s = s.Substring(0, 300) + "…";
+            if (c.Length > 900) c = c.Substring(0, 900) + "…";
+            sb.AppendLine($"- {num} {t}\n  Resumen: {s}\n  Contenido (extracto): {c}");
         }
 
         return DiagramSuggestionsPromptTemplate
