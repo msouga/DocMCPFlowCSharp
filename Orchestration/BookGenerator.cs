@@ -87,6 +87,16 @@ public class BookGenerator : IBookFlowOrchestrator
         _logger.LogInformation("Guardado final de manuscrito (contenido completo)");
         
         _ui.WriteLine("\nListo. Archivo generado: manuscrito.md\n", ConsoleColor.Green);
+
+        // Generar archivo con sugerencias de gráficos (PlantUML/Mermaid/texto)
+        try
+        {
+            await GenerateAndSaveDiagramSuggestions();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudieron generar sugerencias de gráficos");
+        }
     }
 
     private void CollectInitialInputs()
@@ -664,5 +674,36 @@ public class BookGenerator : IBookFlowOrchestrator
         // Eliminar prefijos numéricos (1, 1.2, 1.2.3, etc.) seguidos de espacios
         var cleaned = System.Text.RegularExpressions.Regex.Replace(text, @"^\s*(?:\d+(?:\.\d+)*)\s+", "");
         return cleaned.Trim();
+    }
+
+    private async Task GenerateAndSaveDiagramSuggestions()
+    {
+        _ui.WriteLine("\n[Proceso] Proponiendo diagramas para el manual...", ConsoleColor.Green);
+        var sections = new List<(string num, string title, string summary)>();
+        void Collect(List<ChapterNode> nodes)
+        {
+            foreach (var n in nodes)
+            {
+                sections.Add((n.Number, n.Title, n.Summary ?? string.Empty));
+                if (n.SubChapters.Any()) Collect(n.SubChapters);
+            }
+        }
+        Collect(_spec.TableOfContents);
+
+        var prompt = PromptBuilder.GetDiagramSuggestionsPrompt(
+            _spec.Title,
+            _spec.Topic,
+            _spec.TargetAudience,
+            sections.OrderBy(s => s.num, StringComparer.Ordinal)
+        );
+        var suggestions = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
+        if (string.IsNullOrWhiteSpace(suggestions)) suggestions = "(No se generaron sugerencias de gráficos)";
+
+        if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
+        {
+            var path = System.IO.Path.Combine(RunContext.BackRunDirectory, "graficos_sugeridos.md");
+            await System.IO.File.WriteAllTextAsync(path, suggestions, Encoding.UTF8);
+            _logger.LogInformation("Sugerencias de gráficos guardadas en: {Path}", path);
+        }
     }
 }

@@ -250,4 +250,41 @@ Requisitos:
 
         return payload.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value);
     }
+
+    // Sugerencias de diagramas: prioriza PlantUML; si no aplica, usa Mermaid.
+    private const string DiagramSuggestionsPromptTemplate = @"Eres un asistente que propone gráficos técnicos para un manual.
+Genera una lista de diagramas útiles para ilustrar conceptos clave del documento.
+
+Instrucciones:
+- Prioriza formatos con código: PlantUML preferido; si no aplica, usa Mermaid. Si ninguno aplica, describe textualmente.
+- Por cada sección relevante, sugiere 0–3 diagramas. No fuerces diagramas innecesarios.
+- Indica: Sección (número y título), Nombre del diagrama, Objetivo, Ubicación sugerida (antes/después de qué párrafo o al final de la sección), Formato (plantuml/mermaid/texto), y el bloque de código (si aplica).
+- Evita repetir el contenido del manual. Sé específico.
+
+Contexto del documento:
+- Título: ""{title}""
+- Tema: {topic}
+- Público: {audience}
+- Estructura con resúmenes:
+{sectionSummaries}
+
+Entrega en Markdown. Ordena por número de sección. Usa bloques de código etiquetados (```plantuml o ```mermaid) cuando proporciones código.";
+
+    public static string GetDiagramSuggestionsPrompt(string title, string topic, string audience, IEnumerable<(string num, string title, string summary)> sections)
+    {
+        var sb = new StringBuilder();
+        foreach (var (num, t, sum) in sections)
+        {
+            var s = string.IsNullOrWhiteSpace(sum) ? "(sin resumen)" : sum.Trim();
+            // Limitar cada resumen para no exceder tokens
+            if (s.Length > 400) s = s.Substring(0, 400) + "…";
+            sb.AppendLine($"- {num} {t}: {s}");
+        }
+
+        return DiagramSuggestionsPromptTemplate
+            .Replace("{title}", title)
+            .Replace("{topic}", topic)
+            .Replace("{audience}", audience)
+            .Replace("{sectionSummaries}", sb.ToString());
+    }
 }

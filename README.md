@@ -130,3 +130,9 @@ La autenticación se realiza mediante la variable `OPENAI_API_KEY`. El cliente `
 - El cliente añade la herramienta oficial `web_search` y permite al modelo consultar la web cuando falte contexto.
 - En secciones de contenido (no en overviews), se indica citar 3–5 fuentes al final bajo "Fuentes".
 - Si usas el cliente Chat (sin Responses), `ENABLE_WEB_SEARCH` no tiene efecto (se avisa por consola).
+
+## Sugerencias de gráficos
+
+- Al finalizar el contenido, el orquestador genera `graficos_sugeridos.md` en la carpeta `back/<timestamp>/` con propuestas de diagramas por sección.
+- Formatos preferidos: PlantUML; si no procede, Mermaid; si ninguno aplica, descripción textual.
+- Cada entrada indica sección destino, objetivo, ubicación recomendada y bloque de código (cuando corresponde).
