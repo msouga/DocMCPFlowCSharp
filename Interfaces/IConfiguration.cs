@@ -15,7 +15,10 @@ public interface IConfiguration
     bool DemoMode { get; }
     bool DebugLogging { get; }
     bool UseResponsesApi { get; }
+    bool EnableWebSearch { get; }
     bool CacheSystemInput { get; }
     bool CacheBookContext { get; }
     bool ResponsesStrictJson { get; }
+    string? IndexMdPath { get; }
+    bool CustomBeautifyEnabled { get; }
 }

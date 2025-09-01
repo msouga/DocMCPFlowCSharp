@@ -22,6 +22,12 @@ public class OpenAiSdkLlmClient : ILlmClient
             throw new InvalidOperationException("OPENAI_API_KEY environment variable not set.");
         }
         _client = new ChatClient(config.Model, apiKey);
+
+        if (_config.EnableWebSearch)
+        {
+            _ui.WriteLine("[Aviso] ENABLE_WEB_SEARCH está activo pero el cliente actual es Chat (sin herramientas). Activa USE_RESPONSES_API=true para habilitar búsquedas web.", ConsoleColor.Yellow);
+            try { _logger.LogWarning("ENABLE_WEB_SEARCH ignorado con ChatClient. UseResponsesApi=false"); } catch { }
+        }
     }
 
     public async Task<string> AskAsync(string system, string user, string model, int maxTokens, string? jsonSchema = null)
@@ -72,8 +78,13 @@ public class OpenAiSdkLlmClient : ILlmClient
                 // Fallback si el tipo de opciones no existe en esta versión
                 completion = await _client.CompleteChatAsync(messages);
             }
-            try { _logger.LogInformation("OpenAI response ← len={Len}", completion.Content?[0]?.Text?.Length ?? 0); } catch { }
-            return completion.Content[0].Text;
+            try { _logger.LogInformation("OpenAI response ← len={Len}", completion?.Content?[0]?.Text?.Length ?? 0); } catch { }
+            if (completion?.Content is null || completion.Content.Count == 0)
+            {
+                return string.Empty;
+            }
+            var first = completion.Content[0]?.Text;
+            return first ?? string.Empty;
         }
         catch (Exception ex)
         {

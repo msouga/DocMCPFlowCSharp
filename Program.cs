@@ -40,11 +40,13 @@ internal class Program
             });
             var log = loggerFactory.CreateLogger<Program>();
             log.LogInformation($"Inicio de sesión — {DateTime.Now:O}");
+            log.LogInformation("CONFIG → Model={Model}, DemoMode={Demo}, IndexMdPath={Index}, CustomBeautify={Beautify}",
+                config.Model, config.DemoMode, string.IsNullOrWhiteSpace(config.IndexMdPath) ? "(none)" : config.IndexMdPath, config.CustomBeautifyEnabled);
 
             ILlmClient llmClient = config.UseResponsesApi
                 ? new OpenAiResponsesLlmClient(config, ui, loggerFactory.CreateLogger<OpenAiResponsesLlmClient>())
                 : new OpenAiSdkLlmClient(config, ui, loggerFactory.CreateLogger<OpenAiSdkLlmClient>());
-            var manuscriptWriter = new MarkdownManuscriptWriter(loggerFactory.CreateLogger<MarkdownManuscriptWriter>());
+            var manuscriptWriter = new MarkdownManuscriptWriter(loggerFactory.CreateLogger<MarkdownManuscriptWriter>(), config);
             
             var orchestrator = new BookGenerator(config, ui, llmClient, manuscriptWriter, loggerFactory.CreateLogger<BookGenerator>());
 
@@ -83,7 +85,7 @@ internal class Program
             });
             var log = loggerFactory.CreateLogger<Program>();
             var llmClient = new OpenAiSdkLlmClient(config, ui, loggerFactory.CreateLogger<OpenAiSdkLlmClient>());
-            var manuscriptWriter = new MarkdownManuscriptWriter(loggerFactory.CreateLogger<MarkdownManuscriptWriter>());
+            var manuscriptWriter = new MarkdownManuscriptWriter(loggerFactory.CreateLogger<MarkdownManuscriptWriter>(), config);
             var orchestrator = new BookGenerator(config, ui, llmClient, manuscriptWriter, loggerFactory.CreateLogger<BookGenerator>());
 
             var flowSw = Stopwatch.StartNew();

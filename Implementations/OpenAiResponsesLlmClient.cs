@@ -30,6 +30,11 @@ public class OpenAiResponsesLlmClient : ILlmClient
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         if (string.IsNullOrEmpty(apiKey)) throw new InvalidOperationException("OPENAI_API_KEY not set");
         _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+        var betaHeader = Environment.GetEnvironmentVariable("OPENAI_BETA_HEADER");
+        if (!string.IsNullOrWhiteSpace(betaHeader))
+        {
+            try { _http.DefaultRequestHeaders.Add("OpenAI-Beta", betaHeader!); } catch { }
+        }
     }
 
     public async Task<string> AskAsync(string system, string user, string model, int maxTokens, string? jsonSchema = null)
@@ -83,6 +88,23 @@ public class OpenAiResponsesLlmClient : ILlmClient
                 ["max_output_tokens"] = maxTokens,
                 ["temperature"] = isOverview ? 0.3 : 0.7
             };
+
+            // Si está habilitada la búsqueda web, añadimos la herramienta oficial
+            if (_config.EnableWebSearch)
+            {
+                var tools = new JsonArray
+                {
+                    new JsonObject { ["type"] = "web_search" }
+                };
+                root["tools"] = tools;
+                root["tool_choice"] = "auto";
+
+                // Para nodos de contenido (no overview), incentivamos citar fuentes
+                if (!isOverview)
+                {
+                    user += "\n\nSi falta contexto, realiza búsquedas web cuando sea útil y cita 3–5 fuentes relevantes con URL en una sección 'Fuentes' al final.";
+                }
+            }
 
             if (_config.ResponsesStrictJson && !string.IsNullOrWhiteSpace(jsonSchema))
             {

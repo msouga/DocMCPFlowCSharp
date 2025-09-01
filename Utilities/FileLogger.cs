@@ -45,7 +45,7 @@ internal class FileLogger : ILogger
         _minLevel = minLevel;
     }
 
-    public IDisposable BeginScope<TState>(TState state) => default!;
+    public IDisposable BeginScope<TState>(TState state) where TState : notnull => NoopDisposable.Instance;
 
     public bool IsEnabled(LogLevel logLevel) => logLevel >= _minLevel;
 
@@ -64,4 +64,11 @@ internal class FileLogger : ILogger
         }
         catch { /* no romper ejecución por fallos de log */ }
     }
+}
+
+internal sealed class NoopDisposable : IDisposable
+{
+    public static readonly NoopDisposable Instance = new NoopDisposable();
+    private NoopDisposable() { }
+    public void Dispose() { }
 }

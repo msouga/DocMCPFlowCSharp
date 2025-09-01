@@ -14,6 +14,7 @@ public class BookGenerator : IBookFlowOrchestrator
     private readonly IManuscriptWriter _writer;
     private readonly BookSpecification _spec = new();
     private readonly ILogger<BookGenerator> _logger;
+    private bool _tocLoadedFromFile = false;
 
     public BookGenerator(IConfiguration config, IUserInteraction ui, ILlmClient llm, IManuscriptWriter writer, ILogger<BookGenerator> logger)
     {
@@ -29,7 +30,10 @@ public class BookGenerator : IBookFlowOrchestrator
         CollectInitialInputs();
         _logger.LogInformation("Entradas iniciales — Título: '{Title}', Público: '{Audience}', Tema: '{Topic}'", _spec.Title, _spec.TargetAudience, _spec.Topic);
         await GenerateTableOfContents();
-        DisplayAndEditTableOfContents();
+        if (!_tocLoadedFromFile)
+        {
+            DisplayAndEditTableOfContents();
+        }
         _logger.LogInformation("Índice finalizado por el usuario");
         NumberNodes(_spec.TableOfContents, "", 1);
 
@@ -87,21 +91,114 @@ public class BookGenerator : IBookFlowOrchestrator
 
     private void CollectInitialInputs()
     {
-        _spec.Title = _ui.ReadLine("Título del documento: ").Trim();
-        while (string.IsNullOrWhiteSpace(_spec.Title))
-            _spec.Title = _ui.ReadLine("Por favor, ingresa un título: ").Trim();
+        var indexPath = _config.IndexMdPath;
+        var hasIndexFile = !string.IsNullOrWhiteSpace(indexPath) && System.IO.File.Exists(indexPath);
+        // Permitir preconfigurar respuestas por variables de entorno (modo no interactivo)
+        string? envAudience = Environment.GetEnvironmentVariable("TARGET_AUDIENCE");
+        if (!string.IsNullOrWhiteSpace(envAudience)) envAudience = envAudience!.Trim();
+        string? envTopic = Environment.GetEnvironmentVariable("TOPIC");
+        if (!string.IsNullOrWhiteSpace(envTopic)) envTopic = envTopic!.Trim();
+        string? envTitle = Environment.GetEnvironmentVariable("DOC_TITLE");
+        if (!string.IsNullOrWhiteSpace(envTitle)) envTitle = envTitle!.Trim();
 
-        _spec.TargetAudience = _ui.ReadLine("Público Objetivo (ej. Principiante, Experto): ").Trim();
-        while (string.IsNullOrWhiteSpace(_spec.TargetAudience))
-            _spec.TargetAudience = _ui.ReadLine("Por favor, ingresa el público objetivo: ").Trim();
+        if (hasIndexFile)
+        {
+            // Precargar título desde H1 del archivo
+            TryLoadTitleFromIndexFile();
+            // No pedir título. Pedir solo Público y Descripción.
+            if (!string.IsNullOrWhiteSpace(envAudience))
+            {
+                _spec.TargetAudience = envAudience!;
+            }
+            else
+            {
+                _spec.TargetAudience = _ui.ReadLine("Público objetivo (ej. Principiante, Experto): ").Trim();
+                while (string.IsNullOrWhiteSpace(_spec.TargetAudience))
+                    _spec.TargetAudience = _ui.ReadLine("Por favor, ingresa el público objetivo: ").Trim();
+            }
 
-        _spec.Topic = _ui.ReadLine("Tema (ej. Azure Functions, Patrones de Diseño): ").Trim();
-        while (string.IsNullOrWhiteSpace(_spec.Topic))
-            _spec.Topic = _ui.ReadLine("Por favor, ingresa un tema: ").Trim();
+            if (!string.IsNullOrWhiteSpace(envTopic))
+            {
+                _spec.Topic = envTopic!;
+            }
+            else
+            {
+                _spec.Topic = _ui.ReadLine("Descripción breve del documento: ").Trim();
+                while (string.IsNullOrWhiteSpace(_spec.Topic))
+                    _spec.Topic = _ui.ReadLine("Por favor, ingresa una descripción breve: ").Trim();
+            }
+        }
+        else
+        {
+            // Flujo original (sin índice externo)
+            if (!string.IsNullOrWhiteSpace(envTitle))
+            {
+                _spec.Title = envTitle!;
+            }
+            else
+            {
+                _spec.Title = _ui.ReadLine("Título del documento: ").Trim();
+                while (string.IsNullOrWhiteSpace(_spec.Title))
+                    _spec.Title = _ui.ReadLine("Por favor, ingresa un título: ").Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(envAudience))
+            {
+                _spec.TargetAudience = envAudience!;
+            }
+            else
+            {
+                _spec.TargetAudience = _ui.ReadLine("Público Objetivo (ej. Principiante, Experto): ").Trim();
+                while (string.IsNullOrWhiteSpace(_spec.TargetAudience))
+                    _spec.TargetAudience = _ui.ReadLine("Por favor, ingresa el público objetivo: ").Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(envTopic))
+            {
+                _spec.Topic = envTopic!;
+            }
+            else
+            {
+                _spec.Topic = _ui.ReadLine("Tema (ej. Azure Functions, Patrones de Diseño): ").Trim();
+                while (string.IsNullOrWhiteSpace(_spec.Topic))
+                    _spec.Topic = _ui.ReadLine("Por favor, ingresa un tema: ").Trim();
+            }
+        }
+    }
+
+    private void TryLoadTitleFromIndexFile()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_config.IndexMdPath) &&
+                System.IO.File.Exists(_config.IndexMdPath))
+            {
+                var path = _config.IndexMdPath!;
+                foreach (var raw in System.IO.File.ReadLines(path))
+                {
+                    var line = raw.Trim();
+                    if (line.StartsWith("# "))
+                    {
+                        _spec.Title = line.Substring(2).Trim();
+                        _logger.LogInformation("Título precargado desde INDEX_MD_PATH: {Title}", _spec.Title);
+                        break;
+                    }
+                }
+            }
+        }
+        catch { /* no-op */ }
     }
 
     private async Task GenerateTableOfContents()
     {
+        // 1) Índice externo por archivo (si existe) anula Demo/LLM
+        if (TryLoadTocFromIndexFile())
+        {
+            _ui.WriteLine("\n[Índice] Cargado desde archivo externo (INDEX_MD_PATH).", ConsoleColor.Yellow);
+            _logger.LogInformation("TOC cargado desde archivo externo");
+            _tocLoadedFromFile = true;
+            return;
+        }
         if (_config.DemoMode)
         {
             _ui.WriteLine("\n[Demo] Modo demo activo: usando índice mínimo (2 capítulos × 2 subcapítulos).", ConsoleColor.Yellow);
@@ -127,6 +224,93 @@ public class BookGenerator : IBookFlowOrchestrator
             _logger.LogError(ex, "Error al parsear TOC JSON: {Message}", ex.Message);
             Environment.Exit(1);
         }
+    }
+
+    private bool TryLoadTocFromIndexFile()
+    {
+        try
+        {
+            var idxPath = _config.IndexMdPath;
+            if (string.IsNullOrWhiteSpace(idxPath) || !System.IO.File.Exists(idxPath)) return false;
+
+            _logger.LogInformation("Leyendo índice externo desde: {Path}", idxPath);
+            var rawText = System.IO.File.ReadAllText(idxPath);
+            var lines = rawText.Replace("\r\n", "\n").Split('\n');
+            _logger.LogInformation("Archivo índice cargado (bytes={Bytes}, líneas={Lines})", rawText.Length, lines.Length);
+            // Muestra un extracto inicial del archivo (primeras 25 líneas)
+            var preview = string.Join("\n", lines.Take(25));
+            _logger.LogDebug("Preview índice (primeras 25 líneas):\n{Preview}", preview);
+            var toc = new List<ChapterNode>();
+            var stack = new Dictionary<int, ChapterNode>();
+            foreach (var raw in lines)
+            {
+                var line = raw.TrimEnd();
+                var m = System.Text.RegularExpressions.Regex.Match(line, @"^\s{0,3}(#{1,6})\s+(.*\S)\s*$");
+                if (!m.Success) continue;
+                var level = m.Groups[1].Value.Length; // 1..6
+                var text = m.Groups[2].Value.Trim();
+                // Limpiar prefijos numéricos del texto del encabezado para evitar duplicación
+                // p.ej. "1.1 Introducción" -> "Introducción". En H2 solemos permitir "Capítulo N: ...".
+                text = CleanHeadingText(text, level);
+                if (level == 1)
+                {
+                    if (string.IsNullOrWhiteSpace(_spec.Title)) _spec.Title = text;
+                    continue; // H1 es título global
+                }
+
+                var node = new ChapterNode { Title = text };
+                if (level == 2)
+                {
+                    toc.Add(node);
+                    stack[2] = node;
+                    stack.Remove(3); stack.Remove(4); stack.Remove(5); stack.Remove(6);
+                }
+                else if (level == 3)
+                {
+                    if (stack.TryGetValue(2, out var parent)) parent.SubChapters.Add(node);
+                    stack[3] = node;
+                    stack.Remove(4); stack.Remove(5); stack.Remove(6);
+                }
+                else if (level == 4)
+                {
+                    if (stack.TryGetValue(3, out var parent)) parent.SubChapters.Add(node);
+                    stack[4] = node;
+                    stack.Remove(5); stack.Remove(6);
+                }
+                else if (level >= 5)
+                {
+                    if (stack.TryGetValue(4, out var parent)) parent.SubChapters.Add(node);
+                    stack[5] = node;
+                }
+            }
+            if (toc.Count > 0)
+            {
+                _spec.TableOfContents = toc;
+                // Métricas de estructura
+                int h2 = toc.Count;
+                int h3 = toc.Sum(c => c.SubChapters.Count);
+                int h4 = toc.Sum(c => c.SubChapters.Sum(sc => sc.SubChapters.Count));
+                _logger.LogInformation("Índice parseado: H2={H2} H3={H3} H4={H4}", h2, h3, h4);
+                // Listado plano del TOC
+                var sb = new System.Text.StringBuilder();
+                void Dump(List<ChapterNode> nodes, string indent)
+                {
+                    foreach (var n in nodes)
+                    {
+                        sb.AppendLine($"{indent}- {n.Title}");
+                        if (n.SubChapters.Any()) Dump(n.SubChapters, indent + "  ");
+                    }
+                }
+                Dump(_spec.TableOfContents, "");
+                _logger.LogDebug("TOC desde archivo:\n{Toc}", sb.ToString());
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fallo al cargar TOC desde INDEX_MD_PATH");
+        }
+        return false;
     }
 
     private List<ChapterNode> BuildDemoToc()
@@ -459,5 +643,26 @@ public class BookGenerator : IBookFlowOrchestrator
                 BuildTocStringRecursive(node.SubChapters, sb, indent + "  ");
             }
         }
+    }
+
+    // Quita prefijos numéricos tipo "1 ", "1.2 ", "1.2.3 " del texto del encabezado.
+    // En H2 además elimina el prefijo "Capítulo N:" para dejar solo el título puro.
+    private static string CleanHeadingText(string text, int level)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return text;
+
+        // Si es H2 y empieza con "Capítulo/Capitulo N:" quitarlo y quedarse con el resto
+        if (level == 2)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(text, @"^\s*Cap[ií]tulo\s+\d+(?:\s*[:\-\.])?\s*(.+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (m.Success)
+            {
+                return m.Groups[1].Value.Trim();
+            }
+        }
+
+        // Eliminar prefijos numéricos (1, 1.2, 1.2.3, etc.) seguidos de espacios
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(text, @"^\s*(?:\d+(?:\.\d+)*)\s+", "");
+        return cleaned.Trim();
     }
 }

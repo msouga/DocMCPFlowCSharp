@@ -25,7 +25,14 @@ public class ConsoleUserInteraction : IUserInteraction
     public string ReadLine(string prompt)
     {
         Write(prompt);
-        return Console.ReadLine() ?? string.Empty;
+        var line = Console.ReadLine();
+        if (line is null)
+        {
+            // Evita loops infinitos cuando la entrada estándar se agota (EOF),
+            // por ejemplo al usar pipes y no hay más líneas disponibles.
+            throw new System.IO.EndOfStreamException("Se alcanzó el fin de la entrada estándar (EOF) y no hay más datos para leer.");
+        }
+        return line;
     }
 
     public bool Confirm(string prompt)

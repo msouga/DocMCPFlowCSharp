@@ -21,7 +21,10 @@ public class EnvironmentConfiguration : IConfiguration
     public bool DemoMode => (Environment.GetEnvironmentVariable("DEMO_MODE") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool DebugLogging => (Environment.GetEnvironmentVariable("DEBUG") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool UseResponsesApi => (Environment.GetEnvironmentVariable("USE_RESPONSES_API") ?? "false").Trim().ToLowerInvariant() == "true";
+    public bool EnableWebSearch => (Environment.GetEnvironmentVariable("ENABLE_WEB_SEARCH") ?? "false").Trim().ToLowerInvariant() == "true";
     public bool CacheSystemInput => (Environment.GetEnvironmentVariable("CACHE_SYSTEM_INPUT") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool CacheBookContext => (Environment.GetEnvironmentVariable("CACHE_BOOK_CONTEXT") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool ResponsesStrictJson => (Environment.GetEnvironmentVariable("RESPONSES_STRICT_JSON") ?? "false").Trim().ToLowerInvariant() == "true";
+    public string? IndexMdPath => Environment.GetEnvironmentVariable("INDEX_MD_PATH");
+    public bool CustomBeautifyEnabled => (Environment.GetEnvironmentVariable("CUSTOM_MD_BEAUTIFY") ?? "true").Trim().ToLowerInvariant() == "true";
 }

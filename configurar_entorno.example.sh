@@ -53,6 +53,23 @@ export USE_RESPONSES_API="${USE_RESPONSES_API:-false}"
 export CACHE_SYSTEM_INPUT="${CACHE_SYSTEM_INPUT:-true}"
 export CACHE_BOOK_CONTEXT="${CACHE_BOOK_CONTEXT:-true}"
 export RESPONSES_STRICT_JSON="${RESPONSES_STRICT_JSON:-false}"
+export ENABLE_WEB_SEARCH="${ENABLE_WEB_SEARCH:-false}"   # si true y USE_RESPONSES_API=true, habilita herramienta de búsqueda web
+
+# Si deseas cargar el índice desde un archivo Markdown en vez de generarlo:
+#   Formato: H1 título, H2 capítulos, H3 subcapítulos, H4 sub-sub.
+# export INDEX_MD_PATH="/ruta/a/indice.md"
+
+# Habilitar/deshabilitar el embellecedor personalizado (Markdig siempre corre)
+export CUSTOM_MD_BEAUTIFY="${CUSTOM_MD_BEAUTIFY:-true}"
+
+# — Opcionales para ejecución no interactiva —
+# Si defines estas variables, el programa NO te preguntará por ellas:
+#   - TARGET_AUDIENCE: público objetivo (p.ej., "Programadores C# intermedios")
+#   - TOPIC: descripción breve/tema del documento
+#   - DOC_TITLE: título del documento (solo si NO usas INDEX_MD_PATH)
+# export TARGET_AUDIENCE="Programadores C# intermedios"
+# export TOPIC="Buenas prácticas y patrones con Azure Storage"
+# export DOC_TITLE="Azure Storage para programadores C#"
 
 echo "✅ Plantilla de variables de entorno cargada (sin credenciales)."
 echo "ℹ️ Copia a configurar_entorno.sh y añade tu clave real."

@@ -34,9 +34,15 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
      export NODE_SUMMARY_WORDS=180            # opcional (nodos con hijos)
      export DEBUG=true                        # opcional (true: Info+Debug; false: solo Warning+Error)
      export USE_RESPONSES_API=false           # opcional (true usa /v1/responses con caché de input)
+     export ENABLE_WEB_SEARCH=false           # opcional (true añade herramienta de búsqueda; requiere USE_RESPONSES_API=true)
      export CACHE_SYSTEM_INPUT=true           # opcional (cachea el system prompt)
      export CACHE_BOOK_CONTEXT=true           # opcional (cachea contexto del libro por corrida)
      export RESPONSES_STRICT_JSON=false       # opcional (usa text.format para forzar JSON)
+     # Opcionales para ejecución no interactiva (evita prompts):
+     export TARGET_AUDIENCE="Programadores C# intermedios"
+     export TOPIC="Azure Storage práctico desde C#"
+     # Si NO usas INDEX_MD_PATH, puedes precargar también el título:
+     # export DOC_TITLE="Azure Storage para programadores C#"
      ```
 
 3) Compilar y ejecutar:
@@ -60,8 +66,13 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
   # (Se eliminó el límite de llamadas por contenido; usa DEMO_MODE para pruebas 2×2.)
 - `DEBUG`: si `true`, el logging incluye niveles Information y Debug; si `false`, solo Warning y Error. Defecto: `true`.
 - `USE_RESPONSES_API`: si `true`, usa el endpoint `/v1/responses` con soporte de caché de input; si `false`, usa el cliente Chat.
+ - `ENABLE_WEB_SEARCH`: si `true` y `USE_RESPONSES_API=true`, se añade la herramienta `web_search` para permitir búsquedas web automáticas. Para contenido (nodos hoja), se pide citar 3–5 fuentes con URL al final.
 - `CACHE_SYSTEM_INPUT`: si `true`, marca el system prompt como cacheable en Responses.
 - `CACHE_BOOK_CONTEXT`: si `true`, cachea un bloque estable por corrida (título, público, tema y TOC).
+- `INDEX_MD_PATH`: ruta a un archivo Markdown con el índice (opcional). Si se define, el programa carga el título (H1) y la estructura (H2=capítulos, H3=subcapítulos, H4=sub-sub, etc.) desde el archivo y omite la generación de índice por LLM o demo.
+- `CUSTOM_MD_BEAUTIFY`: si `true` aplica reglas propias de embellecido (espaciado de listas, etc.) además de la normalización obligatoria con Markdig. Si `false`, solo se ejecuta Markdig. Por defecto `true`.
+ - `TARGET_AUDIENCE` y `TOPIC`: si se definen, el programa no te los pedirá por consola. Útiles para ejecución desatendida.
+ - `DOC_TITLE`: si no usas `INDEX_MD_PATH`, puedes precargar el título con esta variable.
 
 Estas opciones se leen en `Implementations/EnvironmentConfiguration.cs` y en `Program.cs`.
 
@@ -106,3 +117,16 @@ La autenticación se realiza mediante la variable `OPENAI_API_KEY`. El cliente `
 - Modelos: puedes cambiar el modelo con `OPENAI_MODEL`.
 - Límite de tokens: se aplica de forma best‑effort según la versión del SDK `OpenAI`. El cliente intenta usar `ChatCompletionOptions` y establecer `MaxOutputTokens`/`MaxTokens` si existen; si no, continúa sin límite explícito.
  - Responses API: para gpt-5 / gpt-5-mini / gpt-5-nano puedes activar `USE_RESPONSES_API=true` y aprovechar caché de input efímero (puede requerir un header beta, ver `OPENAI_BETA_HEADER`). Asegúrate de que el system/contexto estable no cambie entre llamadas para maximizar hits.
+ - Índice por archivo: si defines `INDEX_MD_PATH`, usa un `.md` con:
+   - `# Título del documento`
+   - `## Capítulo`
+   - `### Subcapítulo`
+   - `#### Sub-sub` (opcional)
+   El título se precarga del H1 y el índice se toma de los encabezados. Puedes poner numeraciones en los H2/H3/H4, pero el parser las limpia y conserva solo el texto. También elimina el prefijo “Capítulo N:” en H2. Luego el programa genera resúmenes y contenido igual que en el flujo normal.
+
+## Búsqueda Web y citas (opcional)
+
+- Para habilitar búsquedas: `export USE_RESPONSES_API=true` y `export ENABLE_WEB_SEARCH=true`.
+- El cliente añade la herramienta oficial `web_search` y permite al modelo consultar la web cuando falte contexto.
+- En secciones de contenido (no en overviews), se indica citar 3–5 fuentes al final bajo "Fuentes".
+- Si usas el cliente Chat (sin Responses), `ENABLE_WEB_SEARCH` no tiene efecto (se avisa por consola).

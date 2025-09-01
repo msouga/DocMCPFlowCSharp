@@ -3,15 +3,21 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using System.IO;
+using Markdig;
+using Markdig.Renderers.Normalize;
+using Markdig.Syntax;
 using Microsoft.Extensions.Logging;
 
 public class MarkdownManuscriptWriter : IManuscriptWriter
 {
     private readonly ILogger<MarkdownManuscriptWriter> _logger;
+    private readonly IConfiguration _config;
 
-    public MarkdownManuscriptWriter(ILogger<MarkdownManuscriptWriter> logger)
+    public MarkdownManuscriptWriter(ILogger<MarkdownManuscriptWriter> logger, IConfiguration config)
     {
         _logger = logger;
+        _config = config;
     }
     public async Task SaveAsync(BookSpecification spec, bool final = false)
     {
@@ -53,6 +59,15 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         fullManuscript.AppendLine();
         AppendContent(fullManuscript, spec.TableOfContents, 1);
 
+        // Normalización global del documento: primero Markdig, luego reglas propias (opcionales)
+        var fullText = fullManuscript.ToString();
+        fullText = NormalizeWithMarkdig(fullText);
+        if (_config.CustomBeautifyEnabled)
+        {
+            fullText = FixColonBacktickSpacing(fullText);
+            fullText = BeautifyLists(fullText);
+        }
+
         // Guardado: sólo cuando final==true; si no, no escribimos a disco
         if (!final)
         {
@@ -70,7 +85,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
             {
                 var backPath = System.IO.Path.Combine(RunContext.BackRunDirectory, "manuscrito.md");
-                await System.IO.File.WriteAllTextAsync(backPath, fullManuscript.ToString(), Encoding.UTF8);
+                await System.IO.File.WriteAllTextAsync(backPath, fullText, Encoding.UTF8);
                 _logger.LogInformation("Archivo manuscrito.md guardado en back: {Path}", backPath);
             }
         }
@@ -83,6 +98,13 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             onlyChapters.AppendLine($"# {spec.Title}");
             onlyChapters.AppendLine();
             AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: true);
+            var onlyChaptersText = onlyChapters.ToString();
+            onlyChaptersText = NormalizeWithMarkdig(onlyChaptersText);
+            if (_config.CustomBeautifyEnabled)
+            {
+                onlyChaptersText = FixColonBacktickSpacing(onlyChaptersText);
+                onlyChaptersText = BeautifyLists(onlyChaptersText);
+            }
             try
             {
                 // Borrar copias antiguas en raíz si existen
@@ -94,7 +116,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
                 {
                     var backPath2 = System.IO.Path.Combine(RunContext.BackRunDirectory, "manuscrito_capitulos.md");
-                    await System.IO.File.WriteAllTextAsync(backPath2, onlyChapters.ToString(), Encoding.UTF8);
+                    await System.IO.File.WriteAllTextAsync(backPath2, onlyChaptersText, Encoding.UTF8);
                     _logger.LogInformation("Archivo manuscrito_capitulos.md guardado en back: {Path}", backPath2);
                 }
             }
@@ -133,8 +155,8 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
 
     private void AppendContent(StringBuilder sb, List<ChapterNode> nodes, int level, bool includeHeaders = true)
     {
-        // Niveles: 1 => ## Capítulo, 2 => ### Subcapítulo, 3 => #### Sub-sub.
-        // Capar en 4 (# título global se escribe aparte)
+        // Encabezado del nodo: 1 => ## Capítulo, 2 => ### Subcapítulo, 3 => #### Sub-sub.
+        // Para el encabezado del nodo, capamos en 4 (# título global se escribe aparte).
         var headerLevel = Math.Min(level + 1, 4);
         var headerPrefix = new string('#', headerLevel);
         foreach (var node in nodes)
@@ -145,10 +167,16 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 sb.AppendLine();
             }
             var content = node.Content ?? string.Empty;
-            // Sanitizar encabezados internos para no superar nivel #### y evitar duplicar el H3 del subcapítulo
-            content = SanitizeInternalHeadings(content, node.Number, node.Title);
-            // Asegurar separación entre líneas que terminan en ':' y la siguiente que inicia con backticks
-            content = FixColonBacktickSpacing(content);
+            // Sanitizar encabezados internos: ajustarlos a un nivel relativo al encabezado del nodo
+            // y evitar duplicar el título del propio nodo.
+            content = SanitizeInternalHeadings(content, node.Number, node.Title, headerLevel);
+            if (_config.CustomBeautifyEnabled)
+            {
+                // Asegurar separación entre ':' y la siguiente que inicia con backticks
+                content = FixColonBacktickSpacing(content);
+                // Mejorar legibilidad de listas con líneas en blanco estratégicas
+                content = BeautifyLists(content);
+            }
             // Si es un capítulo con subcapítulos, impedir que el overview duplique rótulos de subcapítulos
             if (level == 1 && node.SubChapters.Any())
             {
@@ -169,35 +197,53 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         }
     }
 
-    private static string SanitizeInternalHeadings(string content, string number, string title)
+    private static string SanitizeInternalHeadings(string content, string number, string title, int parentHeaderLevel)
     {
         if (string.IsNullOrWhiteSpace(content)) return content;
 
         var lines = content.Replace("\r\n", "\n").Split('\n');
-        var headerPattern = new Regex($@"^\s*#+\s+{Regex.Escape(number)}\s+{Regex.Escape(title)}\s*$", RegexOptions.Compiled);
-
         var result = new StringBuilder(content.Length + 64);
-        bool firstLineProcessed = false;
+
+        // Patrones globales para detectar líneas que repitan el encabezado del propio nodo
+        var numEsc = Regex.Escape(number);
+        var titleEsc = Regex.Escape(title);
+        var dupRegexes = new[]
+        {
+            new Regex($@"^\s*#{1,6}\s*{numEsc}\s*[\u2014\u2013\-:]?\s*{titleEsc}\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex($@"^\s*#{1,6}\s*{titleEsc}\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex($@"^\s*{numEsc}\s*[\u2014\u2013\-:]?\s*{titleEsc}\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled)
+        };
+
+        bool firstNonEmptyProcessed = false;
         foreach (var raw in lines)
         {
             var line = raw;
-            if (!firstLineProcessed)
+
+            // Omitir espacios en blanco iniciales hasta ver la primera línea no vacía
+            if (!firstNonEmptyProcessed && string.IsNullOrWhiteSpace(line))
             {
-                // Si la primera línea repite el encabezado del subcapítulo, eliminarla
-                if (Regex.IsMatch(line, $@"^\s*#+\s+{Regex.Escape(number)}\s+{Regex.Escape(title)}\s*$"))
-                {
-                    firstLineProcessed = true;
-                    continue;
-                }
-                firstLineProcessed = true;
+                continue;
             }
 
-            // Normalizar cualquier encabezado a como máximo nivel 4 (####)
+            // Omitir cualquier línea que duplique el encabezado del propio nodo (en cualquier posición)
+            if (dupRegexes.Any(rx => rx.IsMatch(line)))
+            {
+                firstNonEmptyProcessed = true;
+                continue;
+            }
+
+            if (!firstNonEmptyProcessed)
+            {
+                firstNonEmptyProcessed = true;
+            }
+
+            // Normalizar cualquier encabezado interno a un nivel relativo al encabezado del nodo
+            // Si el nodo usa 'headerLevel', los encabezados internos se bajan a 'min(headerLevel+1, 6)'
             if (Regex.IsMatch(line, @"^\s*#{1,6}\s+"))
             {
-                // Capturar el texto del encabezado y reescribir con ####
                 var text = Regex.Replace(line, @"^\s*#{1,6}\s+", "").TrimEnd();
-                line = $"#### {text}";
+                var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
+                line = new string('#', internalLevel) + " " + text;
             }
 
             result.AppendLine(line);
@@ -279,5 +325,111 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             System.Text.RegularExpressions.RegexOptions.Multiline
         );
         return text.Replace("\n", System.Environment.NewLine);
+    }
+
+    private static string NormalizeWithMarkdig(string input)
+    {
+        try
+        {
+            var pipeline = new MarkdownPipelineBuilder()
+                .UseAdvancedExtensions()
+                .Build();
+
+            var doc = Markdown.Parse(input, pipeline);
+            using var sw = new StringWriter();
+            var renderer = new NormalizeRenderer(sw);
+            pipeline.Setup(renderer);
+            renderer.Write(doc);
+            return sw.ToString();
+        }
+        catch
+        {
+            // En caso de cualquier problema con Markdig, devolver el texto original
+            return input;
+        }
+    }
+
+    // Reglas de embellecimiento de Markdown (extensible)
+    private static string BeautifyLists(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var result = new StringBuilder(content.Length + 64);
+
+        bool inCode = false;
+        string prevLine = "";
+        string prevNonBlankLine = "";
+        bool prevNonBlankIsBullet = false;
+        int prevNonBlankBulletIndent = -1; // válido si prevNonBlankIsBullet
+        bool lastEmittedBlank = false;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+
+            // Control rudimentario de fences de código
+            if (line.TrimStart().StartsWith("```") || line.TrimStart().StartsWith("~~~"))
+            {
+                inCode = !inCode;
+                result.AppendLine(line);
+                prevLine = line;
+                continue;
+            }
+            if (inCode)
+            {
+                result.AppendLine(line);
+                prevLine = line;
+                continue;
+            }
+
+            // Detectar bullets con su indentación
+            var m = System.Text.RegularExpressions.Regex.Match(line, @"^(\s*)-\s+");
+            bool isBullet = m.Success;
+            int indent = isBullet ? m.Groups[1].Value.Length : -1;
+
+            // Reglas pedidas:
+            // - Antes de que empiece una lista y después de un párrafo NO lista: agregar una línea en blanco.
+            // - Dentro de la lista NO agregar líneas en blanco, salvo si empieza una sublista y
+            //   la línea no vacía anterior termina en ':' → agregar línea en blanco antes de la sublista.
+            if (isBullet)
+            {
+                if (!string.IsNullOrWhiteSpace(prevNonBlankLine))
+                {
+                    if (!prevNonBlankIsBullet)
+                    {
+                        // Párrafo (no lista) → Lista
+                        if (!lastEmittedBlank)
+                        {
+                            result.AppendLine("");
+                            lastEmittedBlank = true;
+                        }
+                    }
+                    else
+                    {
+                        // Lista → ¿Sublista?
+                        if (indent > prevNonBlankBulletIndent && prevNonBlankLine.TrimEnd().EndsWith(":"))
+                        {
+                            if (!lastEmittedBlank)
+                            {
+                                result.AppendLine("");
+                                lastEmittedBlank = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            result.AppendLine(line);
+            lastEmittedBlank = string.IsNullOrWhiteSpace(line);
+            prevLine = line;
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                prevNonBlankLine = line;
+                prevNonBlankIsBullet = isBullet;
+                prevNonBlankBulletIndent = isBullet ? indent : -1;
+            }
+        }
+
+        return result.ToString().TrimEnd('\n').Replace("\n", System.Environment.NewLine);
     }
 }

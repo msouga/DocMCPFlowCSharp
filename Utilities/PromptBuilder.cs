@@ -32,7 +32,7 @@ Reglas de estructura:
 
 Devuelve únicamente el párrafo de introducción, sin encabezados.";
 
-    private const string SummariesForChapterBlockPromptTemplate = @"Para el siguiente capítulo principal y su lista de subcapítulos, genera un resumen para cada uno.
+    private const string SummariesForChapterBlockPromptTemplate = @"Para el siguiente capítulo principal y todas sus subsecciones (en cualquier nivel), genera un resumen para CADA elemento listado. Incluye también el capítulo principal.
 
 Contexto General:
 - Título del Documento: ""{title}""
@@ -45,7 +45,7 @@ Bloque a resumir:
 - Subcapítulos de este bloque:
 {subchapterTitles}
 
-Devuelve un único objeto JSON. Las claves deben ser los números de sección (ej. ""1"", ""1.1"", ""1.2"") y los valores deben ser sus respectivos resúmenes (entre 150 y 300 palabras cada uno).";
+Devuelve un único objeto JSON. Las claves deben ser los números de sección (ej. ""1"", ""1.1"", ""1.2"", ""1.2.1"", etc.) y los valores deben ser sus respectivos resúmenes (entre 150 y 300 palabras cada uno). No añadas texto fuera del JSON.";
 
     private const string ChapterPromptTemplate = @"Escribe el contenido de la sección **{chapterNumber} — {chapterTitle}**.
 
@@ -62,7 +62,7 @@ Requisitos:
 - Escribe contenido técnico claro y preciso, adaptado al público.
 {targetWordsText}
 - La salida debe ser en formato Markdown.
-- Empieza directamente con el contenido, no repitas el título del capítulo.";
+ - Empieza directamente con el contenido, sin incluir ningún encabezado que repita el número o el título de la sección (p. ej.: ""#### {chapterNumber} — {chapterTitle}"", ""#### {chapterTitle}"").";
 
     private const string SubchapterContentPromptTemplate = @"Redacta el contenido del subcapítulo **{sectionNumber} — {sectionTitle}** en español y formato Markdown.
 
@@ -83,7 +83,7 @@ Requisitos:
 {targetWordsText}
 - Estructura clara. No incluyas el encabezado principal del subcapítulo (se añadirá externamente).
 - Para subsecciones internas usa como máximo encabezados de cuarto nivel (####). No uses niveles 5 o 6.
-- No repitas el título; empieza directamente con el contenido.
+ - No repitas ni incluyas encabezados con el número o el título del subcapítulo (ej.: ""#### {sectionNumber} — {sectionTitle}"", ""#### {sectionTitle}""). Comienza directamente con el contenido.
 - Mantén coherencia y continuidad con el contenido previo si existe.";
 
     private const string ChapterOverviewPromptTemplate = @"Redacta el contenido del capítulo **{chapterNumber} — {chapterTitle}** en español y formato Markdown.
@@ -131,11 +131,25 @@ Requisitos:
 
     public static string GetSummariesForChapterBlockPrompt(string title, string audience, ChapterNode chapter, string previousSummary) 
     {
-        string subchapterTitles = string.Join("\n", chapter.SubChapters.Select(sc => $"- {sc.Number} {sc.Title}"));
+        // Construye una lista plana con todas las subsecciones (cualquier nivel)
+        static void CollectDescendants(ChapterNode node, List<(string num, string title)> acc)
+        {
+            foreach (var child in node.SubChapters)
+            {
+                acc.Add((child.Number ?? string.Empty, child.Title ?? string.Empty));
+                if (child.SubChapters.Any()) CollectDescendants(child, acc);
+            }
+        }
+        var all = new List<(string num, string title)>();
+        CollectDescendants(chapter, all);
+        var subchapterTitles = all.Count == 0
+            ? "(no hay subsecciones)"
+            : string.Join("\n", all.Select(sc => $"- {sc.num} {sc.title}"));
+
         return SummariesForChapterBlockPromptTemplate
             .Replace("{title}", title)
             .Replace("{audience}", audience)
-            .Replace("{previousSummary}", previousSummary)
+            .Replace("{previousSummary}", string.IsNullOrWhiteSpace(previousSummary) ? "(ninguno)" : previousSummary)
             .Replace("{chapterNumber}", chapter.Number)
             .Replace("{chapterTitle}", chapter.Title)
             .Replace("{subchapterTitles}", subchapterTitles);
