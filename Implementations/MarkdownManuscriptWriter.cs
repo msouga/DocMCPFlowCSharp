@@ -97,6 +97,14 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             // Título del libro
             onlyChapters.AppendLine($"# {spec.Title}");
             onlyChapters.AppendLine();
+            // Introducción global debajo del título (si existe)
+            if (!string.IsNullOrWhiteSpace(spec.Introduction))
+            {
+                onlyChapters.AppendLine("## Introducción");
+                onlyChapters.AppendLine();
+                onlyChapters.AppendLine(spec.Introduction.Trim());
+                onlyChapters.AppendLine();
+            }
             AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: true);
             var onlyChaptersText = onlyChapters.ToString();
             onlyChaptersText = NormalizeWithMarkdig(onlyChaptersText);
