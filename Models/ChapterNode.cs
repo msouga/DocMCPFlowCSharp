@@ -8,4 +8,5 @@ public class ChapterNode
     public string Summary { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public List<ChapterNode> SubChapters { get; set; } = new();
+    public List<DiagramPlanItem> Diagrams { get; set; } = new();
 }

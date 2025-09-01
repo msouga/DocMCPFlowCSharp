@@ -690,6 +690,25 @@ public class BookGenerator : IBookFlowOrchestrator
         }
         Collect(_spec.TableOfContents);
 
+        // 1) Plan JSON parseable para insertar marcadores
+        try
+        {
+            var jsonPrompt = PromptBuilder.GetDiagramPlanJsonPrompt(
+                _spec.Title,
+                _spec.Topic,
+                _spec.TargetAudience,
+                sections.OrderBy(s => s.num, StringComparer.Ordinal)
+            );
+            // Pedimos JSON explícito (aunque el cliente Chat no fuerza el formato, el prompt lo exige)
+            var jsonPlan = await _llm.AskAsync(PromptBuilder.SystemPrompt, jsonPrompt, _config.Model, _config.MaxTokensPerCall, jsonSchema: "{}");
+            TryApplyDiagramPlan(jsonPlan);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo parsear plan JSON de diagramas; los marcadores no se insertarán");
+        }
+
+        // 2) Versión Markdown legible para el archivo de sugerencias
         var prompt = PromptBuilder.GetDiagramSuggestionsPrompt(
             _spec.Title,
             _spec.Topic,
@@ -704,6 +723,30 @@ public class BookGenerator : IBookFlowOrchestrator
             var path = System.IO.Path.Combine(RunContext.BackRunDirectory, "graficos_sugeridos.md");
             await System.IO.File.WriteAllTextAsync(path, suggestions, Encoding.UTF8);
             _logger.LogInformation("Sugerencias de gráficos guardadas en: {Path}", path);
+        }
+    }
+
+    private void TryApplyDiagramPlan(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return;
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("diagrams", out var arr) || arr.ValueKind != JsonValueKind.Array) return;
+        foreach (var item in arr.EnumerateArray())
+        {
+            string section = item.TryGetProperty("section_number", out var sn) ? (sn.GetString() ?? "") : "";
+            string name = item.TryGetProperty("name", out var nm) ? (nm.GetString() ?? "") : "";
+            if (string.IsNullOrWhiteSpace(section) || string.IsNullOrWhiteSpace(name)) continue;
+            var (node, _) = FindNode(_spec.TableOfContents, section);
+            if (node == null) continue;
+            var diag = new DiagramPlanItem
+            {
+                Name = name,
+                Purpose = item.TryGetProperty("purpose", out var pu) ? (pu.GetString() ?? "") : "",
+                Format = item.TryGetProperty("format", out var fm) ? (fm.GetString() ?? "") : "",
+                Placement = item.TryGetProperty("placement", out var pl) ? (pl.GetString() ?? "end") : "end",
+                Code = item.TryGetProperty("code", out var cd) ? (cd.GetString() ?? "") : ""
+            };
+            node.Diagrams.Add(diag);
         }
     }
 }

@@ -196,6 +196,17 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 }
             }
             sb.AppendLine(content);
+            // Insertar marcadores de gráficos sugeridos (visibles) al final de la sección
+            if (node.Diagrams.Any())
+            {
+                foreach (var d in node.Diagrams)
+                {
+                    var fmt = string.IsNullOrWhiteSpace(d.Format) ? "(formato no especificado)" : d.Format;
+                    var place = string.IsNullOrWhiteSpace(d.Placement) ? "end" : d.Placement;
+                    sb.AppendLine($"[DIAGRAMA] {node.Number} {node.Title} → {d.Name} | Formato: {fmt} | Ubicación: {place}");
+                }
+                sb.AppendLine();
+            }
             sb.AppendLine();
 
             if (node.SubChapters.Any())

@@ -136,3 +136,6 @@ La autenticación se realiza mediante la variable `OPENAI_API_KEY`. El cliente `
 - Al finalizar el contenido, el orquestador genera `graficos_sugeridos.md` en la carpeta `back/<timestamp>/` con propuestas de diagramas por sección.
 - Formatos preferidos: PlantUML; si no procede, Mermaid; si ninguno aplica, descripción textual.
 - Cada entrada indica sección destino, objetivo, ubicación recomendada y bloque de código (cuando corresponde).
+- Además, se insertan marcadores visibles al final de cada sección en ambos manuscritos (`manuscrito.md` y `manuscrito_capitulos.md`) con el formato:
+  - `[DIAGRAMA] <num> <título> → <nombre> | Formato: <plantuml|mermaid|texto> | Ubicación: <start|end|before_para:N|after_para:N>`
+  - Sirven como guía de dónde insertar el gráfico; si hay código, consulta `graficos_sugeridos.md`.

@@ -289,4 +289,44 @@ Entrega en Markdown. Ordena por número de sección. Usa bloques de código etiq
             .Replace("{audience}", audience)
             .Replace("{sectionSummaries}", sb.ToString());
     }
+
+    // Versión JSON (parseable) del plan de diagramas
+    private const string DiagramPlanJsonPromptTemplate = @"Eres un asistente que genera un plan de diagramas para un manual.
+Devuelve SOLO JSON (sin texto extra) con un array 'diagrams'. Cada elemento debe tener:
+- section_number (string, ej. '2.1')
+- section_title (string)
+- name (string)
+- purpose (string)
+- placement (string: 'start' | 'end' | 'before_para:N' | 'after_para:N')
+- format (string: 'plantuml' | 'mermaid' | 'texto')
+- code (string, opcional; solo si format!='texto')
+
+Instrucciones:
+- Sugiere 0–3 por sección, solo si ayudan a entender mejor el contenido.
+- Prioriza PlantUML; si no procede, Mermaid; si ninguno aplica, usa 'texto' y deja 'code' vacío.
+
+Contexto del documento:
+- Título: ""{title}""
+- Tema: {topic}
+- Público: {audience}
+- Secciones (con extractos):
+{sectionSummaries}";
+
+    public static string GetDiagramPlanJsonPrompt(string title, string topic, string audience, IEnumerable<(string num, string title, string summary, string content)> sections)
+    {
+        var sb = new StringBuilder();
+        foreach (var (num, t, sum, content) in sections)
+        {
+            var s = string.IsNullOrWhiteSpace(sum) ? "(sin resumen)" : sum.Trim();
+            var c = string.IsNullOrWhiteSpace(content) ? "(sin contenido)" : content.Trim();
+            if (s.Length > 300) s = s.Substring(0, 300) + "…";
+            if (c.Length > 900) c = c.Substring(0, 900) + "…";
+            sb.AppendLine($"- {num} {t}\n  Resumen: {s}\n  Contenido (extracto): {c}");
+        }
+        return DiagramPlanJsonPromptTemplate
+            .Replace("{title}", title)
+            .Replace("{topic}", topic)
+            .Replace("{audience}", audience)
+            .Replace("{sectionSummaries}", sb.ToString());
+    }
 }
