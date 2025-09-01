@@ -40,7 +40,7 @@ internal class Program
             });
             var log = loggerFactory.CreateLogger<Program>();
             log.LogInformation($"Inicio de sesión — {DateTime.Now:O}");
-            PrintResolvedConfiguration(config, log);
+            PrintResolvedConfiguration(config, log, ui);
 
             ILlmClient llmClient = config.UseResponsesApi
                 ? new OpenAiResponsesLlmClient(config, ui, loggerFactory.CreateLogger<OpenAiResponsesLlmClient>())
@@ -110,7 +110,7 @@ internal class Program
         }
     }
 
-    private static void PrintResolvedConfiguration(IConfiguration config, ILogger log)
+    private static void PrintResolvedConfiguration(IConfiguration config, ILogger log, IUserInteraction ui)
     {
         string mark(string envName, string? overrideValue = null)
         {
@@ -122,36 +122,42 @@ internal class Program
 
         // Sensibles: no mostrar el valor de la API key
         var apiKeySet = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
-        log.LogInformation("OPENAI_API_KEY: {Val}", apiKeySet ? "(present)" : "(not set)");
-
-        log.LogInformation("OPENAI_MODEL: {Val}", mark("OPENAI_MODEL", config.Model));
-        log.LogInformation("OPENAI_MAX_COMPLETION_TOKENS: {Val}", mark("OPENAI_MAX_COMPLETION_TOKENS", config.MaxTokensPerCall.ToString()));
-        log.LogInformation("OPENAI_HTTP_TIMEOUT_SECONDS: {Val}", mark("OPENAI_HTTP_TIMEOUT_SECONDS", ((int)config.HttpTimeout.TotalSeconds).ToString()));
-        log.LogInformation("DRY_RUN: {Val}", mark("DRY_RUN", valBool(config.IsDryRun)));
-        log.LogInformation("SHOW_USAGE: {Val}", mark("SHOW_USAGE", valBool(config.ShowUsage)));
-        log.LogInformation("TREAT_REFUSAL_AS_ERROR: {Val}", mark("TREAT_REFUSAL_AS_ERROR", valBool(config.TreatRefusalAsError)));
-        log.LogInformation("DEMO_MODE: {Val}", mark("DEMO_MODE", valBool(config.DemoMode)));
-        log.LogInformation("NODE_DETAIL_WORDS: {Val}", mark("NODE_DETAIL_WORDS", config.NodeDetailWords.ToString()));
-        log.LogInformation("NODE_SUMMARY_WORDS: {Val}", mark("NODE_SUMMARY_WORDS", config.NodeSummaryWords.ToString()));
-        log.LogInformation("DEBUG: {Val}", mark("DEBUG", valBool(config.DebugLogging)));
-        log.LogInformation("USE_RESPONSES_API: {Val}", mark("USE_RESPONSES_API", valBool(config.UseResponsesApi)));
-        log.LogInformation("ENABLE_WEB_SEARCH: {Val}", mark("ENABLE_WEB_SEARCH", valBool(config.EnableWebSearch)));
-        log.LogInformation("CACHE_SYSTEM_INPUT: {Val}", mark("CACHE_SYSTEM_INPUT", valBool(config.CacheSystemInput)));
-        log.LogInformation("CACHE_BOOK_CONTEXT: {Val}", mark("CACHE_BOOK_CONTEXT", valBool(config.CacheBookContext)));
-        log.LogInformation("RESPONSES_STRICT_JSON: {Val}", mark("RESPONSES_STRICT_JSON", valBool(config.ResponsesStrictJson)));
+        var lines = new System.Collections.Generic.List<string>();
+        lines.Add($"OPENAI_API_KEY: {(apiKeySet ? "(present)" : "(not set)")}");
+        lines.Add($"OPENAI_MODEL: {mark("OPENAI_MODEL", config.Model)}");
+        lines.Add($"OPENAI_MAX_COMPLETION_TOKENS: {mark("OPENAI_MAX_COMPLETION_TOKENS", config.MaxTokensPerCall.ToString())}");
+        lines.Add($"OPENAI_HTTP_TIMEOUT_SECONDS: {mark("OPENAI_HTTP_TIMEOUT_SECONDS", ((int)config.HttpTimeout.TotalSeconds).ToString())}");
+        lines.Add($"DRY_RUN: {mark("DRY_RUN", valBool(config.IsDryRun))}");
+        lines.Add($"SHOW_USAGE: {mark("SHOW_USAGE", valBool(config.ShowUsage))}");
+        lines.Add($"TREAT_REFUSAL_AS_ERROR: {mark("TREAT_REFUSAL_AS_ERROR", valBool(config.TreatRefusalAsError))}");
+        lines.Add($"DEMO_MODE: {mark("DEMO_MODE", valBool(config.DemoMode))}");
+        lines.Add($"NODE_DETAIL_WORDS: {mark("NODE_DETAIL_WORDS", config.NodeDetailWords.ToString())}");
+        lines.Add($"NODE_SUMMARY_WORDS: {mark("NODE_SUMMARY_WORDS", config.NodeSummaryWords.ToString())}");
+        lines.Add($"DEBUG: {mark("DEBUG", valBool(config.DebugLogging))}");
+        lines.Add($"USE_RESPONSES_API: {mark("USE_RESPONSES_API", valBool(config.UseResponsesApi))}");
+        lines.Add($"ENABLE_WEB_SEARCH: {mark("ENABLE_WEB_SEARCH", valBool(config.EnableWebSearch))}");
+        lines.Add($"CACHE_SYSTEM_INPUT: {mark("CACHE_SYSTEM_INPUT", valBool(config.CacheSystemInput))}");
+        lines.Add($"CACHE_BOOK_CONTEXT: {mark("CACHE_BOOK_CONTEXT", valBool(config.CacheBookContext))}");
+        lines.Add($"RESPONSES_STRICT_JSON: {mark("RESPONSES_STRICT_JSON", valBool(config.ResponsesStrictJson))}");
         var idx = string.IsNullOrWhiteSpace(config.IndexMdPath) ? "(none)" : config.IndexMdPath!;
-        log.LogInformation("INDEX_MD_PATH: {Val}", mark("INDEX_MD_PATH", idx));
-        log.LogInformation("CUSTOM_MD_BEAUTIFY: {Val}", mark("CUSTOM_MD_BEAUTIFY", valBool(config.CustomBeautifyEnabled)));
-        log.LogInformation("PrevChapterTailChars: {Val}", $"{config.PrevChapterTailChars} (Default)");
-
-        // Extras usados para modo no interactivo
+        lines.Add($"INDEX_MD_PATH: {mark("INDEX_MD_PATH", idx)}");
+        lines.Add($"CUSTOM_MD_BEAUTIFY: {mark("CUSTOM_MD_BEAUTIFY", valBool(config.CustomBeautifyEnabled))}");
+        lines.Add($"PrevChapterTailChars: {config.PrevChapterTailChars} (Default)");
         var ta = Environment.GetEnvironmentVariable("TARGET_AUDIENCE");
         var tp = Environment.GetEnvironmentVariable("TOPIC");
         var dt = Environment.GetEnvironmentVariable("DOC_TITLE");
         var beta = Environment.GetEnvironmentVariable("OPENAI_BETA_HEADER");
-        log.LogInformation("TARGET_AUDIENCE: {Val}", string.IsNullOrWhiteSpace(ta) ? "(not set) (Default)" : ta);
-        log.LogInformation("TOPIC: {Val}", string.IsNullOrWhiteSpace(tp) ? "(not set) (Default)" : tp);
-        log.LogInformation("DOC_TITLE: {Val}", string.IsNullOrWhiteSpace(dt) ? "(not set) (Default)" : dt);
-        log.LogInformation("OPENAI_BETA_HEADER: {Val}", string.IsNullOrWhiteSpace(beta) ? "(not set) (Default)" : "(present)");
+        lines.Add($"TARGET_AUDIENCE: {(string.IsNullOrWhiteSpace(ta) ? "(not set) (Default)" : ta)}");
+        lines.Add($"TOPIC: {(string.IsNullOrWhiteSpace(tp) ? "(not set) (Default)" : tp)}");
+        lines.Add($"DOC_TITLE: {(string.IsNullOrWhiteSpace(dt) ? "(not set) (Default)" : dt)}");
+        lines.Add($"OPENAI_BETA_HEADER: {(string.IsNullOrWhiteSpace(beta) ? "(not set) (Default)" : "(present)")}");
+
+        log.LogInformation("— Configuration Resolved —");
+        ui.WriteLine("— Configuration Resolved —", ConsoleColor.Yellow);
+        foreach (var line in lines)
+        {
+            log.LogInformation(line);
+            ui.WriteLine(line, ConsoleColor.DarkGray);
+        }
     }
 }
