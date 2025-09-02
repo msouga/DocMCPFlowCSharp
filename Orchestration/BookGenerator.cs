@@ -721,6 +721,8 @@ public class BookGenerator : IBookFlowOrchestrator
         // Construir apéndice con fuentes citadas por sección (best-effort)
         var appendix = BuildSourcesAppendix();
         var finalDoc = string.IsNullOrWhiteSpace(appendix) ? suggestions : suggestions + "\n\n" + appendix;
+        // Asegurar formato correcto de fences: línea en blanco antes de ``` o ~~~
+        finalDoc = EnsureBlankLineBeforeFences(finalDoc);
 
         if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
         {
@@ -816,5 +818,31 @@ public class BookGenerator : IBookFlowOrchestrator
             }
         }
         return urls.ToList();
+    }
+
+    private static string EnsureBlankLineBeforeFences(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return content;
+        var nl = "\n";
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var sb = new StringBuilder(content.Length + 64);
+        bool first = true;
+        string prevEmitted = string.Empty;
+        foreach (var line in lines)
+        {
+            var trimmed = line.TrimStart();
+            bool isFence = trimmed.StartsWith("```") || trimmed.StartsWith("~~~");
+            if (!first && isFence && !string.IsNullOrWhiteSpace(prevEmitted))
+            {
+                // Insertar una línea en blanco antes del fence
+                sb.Append(nl);
+                prevEmitted = string.Empty; // para no insertar más de una
+            }
+            sb.Append(line);
+            sb.Append(nl);
+            prevEmitted = line;
+            first = false;
+        }
+        return sb.ToString().TrimEnd('\n');
     }
 }
