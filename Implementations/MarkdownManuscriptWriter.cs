@@ -57,8 +57,6 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         fullManuscript.AppendLine();
 
         // 5. Full Content
-        fullManuscript.AppendLine("---");
-        fullManuscript.AppendLine();
         AppendContent(fullManuscript, spec.TableOfContents, 1);
 
         // Normalización global del documento: primero Markdig, luego reglas propias (opcionales)
@@ -232,6 +230,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         var lines = content.Replace("\r\n", "\n").Split('\n');
         var result = new StringBuilder(content.Length + 64);
         bool inCode = false;
+        var hrRx = new Regex(@"^\s{0,3}(-{3,}|\*{3,}|_{3,})\s*$", RegexOptions.Compiled);
 
         // Patrones globales para detectar líneas que repitan el encabezado del propio nodo
         var numEsc = Regex.Escape(number);
@@ -291,6 +290,13 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 continue;
             }
 
+            // Remover reglas horizontales (---, ***, ___) del contenido final
+            if (hrRx.IsMatch(line))
+            {
+                firstNonEmptyProcessed = true;
+                continue;
+            }
+
             // Omitir cualquier línea que duplique el encabezado del propio nodo (en cualquier posición)
             if (dupRegexes.Any(rx => rx.IsMatch(line)))
             {
@@ -341,12 +347,12 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             if (isLeaf)
             {
                 string trimmed = line.Trim();
-                if (!string.IsNullOrEmpty(trimmed) && !trimmed.StartsWith("#") && !trimmed.StartsWith("- ") && !trimmed.StartsWith("* ") && !Regex.IsMatch(trimmed, @"^\d+\.\s+"))
+                if (!string.IsNullOrEmpty(trimmed) && !trimmed.StartsWith("#") && !trimmed.StartsWith("- ") && !trimmed.StartsWith("* ") && !Regex.IsMatch(trimmed, @"^\d+\.\s+") && !hrRx.IsMatch(trimmed))
                 {
                     // Buscar próxima línea no vacía
                     int j = i + 1;
                     string nextNonEmpty = string.Empty;
-                    while (j < lines.Length && string.IsNullOrWhiteSpace(lines[j])) j++;
+                    while (j < lines.Length && (string.IsNullOrWhiteSpace(lines[j]) || hrRx.IsMatch(lines[j]))) j++;
                     if (j < lines.Length) nextNonEmpty = lines[j].TrimStart();
                     bool nextIsList = Regex.IsMatch(nextNonEmpty, @"^(?:[-*+]\s+|\d+\.\s+)");
                     bool endsWithColon = trimmed.EndsWith(":");
@@ -358,7 +364,11 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                     if (shortTitle && (nextIsList || endsWithColon || looksLikeLabel))
                     {
                         var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
-                        result.AppendLine(new string('#', internalLevel) + " " + trimmed.TrimEnd(':'));
+                        var headText = trimmed.TrimEnd(':').Trim();
+                        if (!string.IsNullOrEmpty(headText) && !hrRx.IsMatch(headText))
+                        {
+                            result.AppendLine(new string('#', internalLevel) + " " + headText);
+                        }
                         continue;
                     }
                 }
