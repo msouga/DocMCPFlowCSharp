@@ -295,32 +295,27 @@ public class BookGenerator : IBookFlowOrchestrator
                 }
 
                 // Intentar capturar un sumario inline justo debajo del encabezado
-                // Regla: tomar el primer párrafo inmediatamente posterior (ignorando líneas en blanco iniciales),
-                // hasta la primera línea en blanco, el próximo encabezado, una lista o un bloque de código.
+                // Regla: tomar uno o varios párrafos inmediatamente posteriores (ignorando líneas en blanco iniciales),
+                // hasta el próximo encabezado o un bloque de código. Se permiten líneas en blanco entre párrafos
+                // y viñetas simples; se recomienda que el sumario sea breve.
                 var sbSum = new System.Text.StringBuilder();
                 int k = i + 1;
                 // Saltar líneas en blanco iniciales entre el encabezado y el párrafo del resumen
                 while (k < lines.Length && string.IsNullOrWhiteSpace(lines[k])) k++;
-                bool sawNonEmpty = false;
+                bool sawAny = false;
                 while (k < lines.Length)
                 {
                     var peek = lines[k];
                     if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+")) break; // siguiente encabezado
                     var t = peek.TrimStart();
-                    if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^(?:[-*+]\s+|\d+\.\s+|```|~~~)")) break; // lista o código
-                    if (string.IsNullOrWhiteSpace(peek))
-                    {
-                        if (sawNonEmpty) break; // fin del primer párrafo
-                        // si aún no vimos contenido, seguir saltando blancos
-                        k++;
-                        continue;
-                    }
+                    if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^(?:```|~~~)")) break; // evitar capturar bloques de código
+                    // Aceptar líneas en blanco como separadores de párrafos dentro del sumario
                     sbSum.AppendLine(peek.TrimEnd());
-                    sawNonEmpty = true;
+                    if (!string.IsNullOrWhiteSpace(peek)) sawAny = true;
                     k++;
                 }
                 var inlineSummary = sbSum.ToString().Trim();
-                if (!string.IsNullOrWhiteSpace(inlineSummary))
+                if (!string.IsNullOrWhiteSpace(inlineSummary) && sawAny)
                 {
                     node.Summary = inlineSummary;
                 }
