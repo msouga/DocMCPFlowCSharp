@@ -198,7 +198,8 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             {
                 content = StripSubchapterLabelLines(content, node);
                 var trimmed = content.Trim();
-                if (string.IsNullOrWhiteSpace(trimmed) || trimmed.Length < 60)
+                // Solo usar fallback si quedó vacío; si hay tablas/listas o texto, respetar.
+                if (string.IsNullOrWhiteSpace(trimmed))
                 {
                     content = ComposeChapterOverviewFallback(node);
                 }

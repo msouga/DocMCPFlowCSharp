@@ -111,9 +111,9 @@ Requisitos:
 - La salida debe ser en formato Markdown.
 - Empieza directamente con el contenido, no repitas el título del capítulo.
 - No listes ni repitas títulos o numeraciones de subcapítulos (evita líneas como ""1.1 ..."", ""1.2 ..."").
-- No incluyas encabezados internos, listas, viñetas, bloques de código ni comandos.
- - Redacta 2 a 3 párrafos generales (120-200 palabras en total), de carácter conceptual y sin instrucciones paso a paso.
- - No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").
+- Puedes usar listas y tablas Markdown si aportan claridad (por ejemplo, comparativas o resúmenes), pero evita enumerar los títulos de subcapítulos.
+- Redacta 2 a 4 párrafos o una combinación breve de párrafos y una tabla cuando sea pertinente.
+- No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").
 
     Ejemplo de estilo (no copiar literalmente): redactar 2 párrafos que enmarquen el capítulo a alto nivel, explicando cómo se relacionan los subtemas y qué decisiones o criterios importan, sin listas ni encabezados internos.";
 

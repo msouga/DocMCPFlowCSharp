@@ -611,8 +611,8 @@ public class BookGenerator : IBookFlowOrchestrator
                 node.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, overviewPrompt, _config.Model, _config.MaxTokensPerCall);
                 if (IsOverviewWeak(node.Content, node))
                 {
-                    var strictPrompt = overviewPrompt + "\n\nInstrucción final: escribe 3 párrafos (80-120 palabras cada uno), sin listas, sin encabezados ni numeraciones de secciones.";
-                    _logger.LogInformation("Overview débil para nodo {Number}; reintentando con prompt estricto", node.Number);
+                    var strictPrompt = overviewPrompt + "\n\nInstrucción adicional: si el texto queda demasiado corto, amplíalo con más detalles contextuales y, si ayuda, añade una tabla Markdown breve para resumir comparativas o categorías relevantes. No enumeres los títulos de subcapítulos.";
+                    _logger.LogInformation("Overview débil para nodo {Number}; reintentando con prompt ampliado", node.Number);
                     node.Content = await _llm.AskAsync(PromptBuilder.SystemPrompt, strictPrompt, _config.Model, _config.MaxTokensPerCall);
                 }
                 _logger.LogInformation("Contenido recibido nodo {Number} (len={Len}) – guardando", node.Number, node.Content?.Length ?? 0);
