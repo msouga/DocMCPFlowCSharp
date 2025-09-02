@@ -61,7 +61,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
 
         // Normalización global del documento: primero Markdig, luego reglas propias (opcionales)
         var fullText = fullManuscript.ToString();
-        fullText = NormalizeWithMarkdig(fullText);
+        fullText = MaybeNormalizeWithMarkdig(fullText);
         fullText = CleanMarkdownArtifacts(fullText);
         if (_config.CustomBeautifyEnabled)
         {
@@ -108,7 +108,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             }
             AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: true);
             var onlyChaptersText = onlyChapters.ToString();
-            onlyChaptersText = NormalizeWithMarkdig(onlyChaptersText);
+            onlyChaptersText = MaybeNormalizeWithMarkdig(onlyChaptersText);
             onlyChaptersText = CleanMarkdownArtifacts(onlyChaptersText);
             if (_config.CustomBeautifyEnabled)
             {
@@ -310,6 +310,25 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             if (!firstNonEmptyProcessed)
             {
                 firstNonEmptyProcessed = true;
+            }
+
+            // Si aparece un encabezado ATX incrustado en la misma línea (p. ej. "...Texto#### Título"),
+            // separarlo con salto de línea para no pegarlo al contenido anterior.
+            if (!string.IsNullOrWhiteSpace(line) && !trimmedStart.StartsWith("#"))
+            {
+                foreach (var marker in new[] { "###### ", "##### ", "#### ", "### ", "## ", "# " })
+                {
+                    var idx = line.IndexOf(marker, StringComparison.Ordinal);
+                    if (idx > 0)
+                    {
+                        var left = line.Substring(0, idx).TrimEnd();
+                        var right = line.Substring(idx).TrimStart();
+                        if (!string.IsNullOrEmpty(left)) result.AppendLine(left);
+                        line = right;
+                        trimmedStart = line.TrimStart();
+                        break;
+                    }
+                }
             }
 
             // Normalizar cualquier encabezado interno a un nivel relativo al encabezado del nodo
@@ -541,6 +560,40 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             // En caso de cualquier problema con Markdig, devolver el texto original
             return input;
         }
+    }
+
+    private static bool HasPipeTable(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        var t = text.Replace("\r\n", "\n");
+        // Debe haber al menos una línea con "|" y una línea separadora de cabecera con --- entre pipes
+        var hasPipes = Regex.IsMatch(t, @"^\s*\|.*\|\s*$", RegexOptions.Multiline);
+        var hasSep = Regex.IsMatch(t, @"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$", RegexOptions.Multiline);
+        return hasPipes && hasSep;
+    }
+
+    private static bool HasGridTable(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        var t = text.Replace("\r\n", "\n");
+        // Líneas de borde tipo +-----+-----+
+        var hasBorder = Regex.IsMatch(t, @"^\s*\+[-+]+\+\s*$", RegexOptions.Multiline);
+        var hasCols = Regex.IsMatch(t, @"^\s*\|.*\|\s*$", RegexOptions.Multiline);
+        return hasBorder && hasCols;
+    }
+
+    private static string MaybeNormalizeWithMarkdig(string input)
+    {
+        try
+        {
+            if (HasPipeTable(input) || HasGridTable(input))
+            {
+                // Evitar normalización que pueda aplanar tablas; devolver texto tal cual
+                return input;
+            }
+        }
+        catch { }
+        return NormalizeWithMarkdig(input);
     }
 
     // Limpia artefactos comunes no deseados en Markdown final
