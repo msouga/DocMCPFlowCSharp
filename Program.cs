@@ -5,8 +5,9 @@ using Microsoft.Extensions.Logging;
 
 internal class Program
 {
-    private static async Task Main()
+    private static async Task Main(string[]? args)
     {
+        TryLoadExecutionParameters(args);
         var config = new EnvironmentConfiguration();
         var ui = new ConsoleUserInteraction();
 
@@ -159,6 +160,93 @@ internal class Program
         {
             log.LogInformation(line);
             ui.WriteLine(line, ConsoleColor.DarkGray);
+        }
+    }
+
+    private static void TryLoadExecutionParameters(string[]? args)
+    {
+        // Orden de búsqueda: arg --params/-p, env EXECUTION_PARAMETERS_PATH, archivos por defecto en cwd
+        string? path = null;
+        var a = args ?? Array.Empty<string>();
+        for (int i = 0; i < a.Length; i++)
+        {
+            if ((a[i] == "--params" || a[i] == "-p") && i + 1 < a.Length)
+            {
+                path = a[i + 1];
+                break;
+            }
+        }
+        path ??= Environment.GetEnvironmentVariable("EXECUTION_PARAMETERS_PATH");
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            var cwd = Environment.CurrentDirectory;
+            var cand1 = System.IO.Path.Combine(cwd, "executionparameters.config");
+            var cand2 = System.IO.Path.Combine(cwd, "executionparameters.json");
+            if (System.IO.File.Exists(cand1)) path = cand1;
+            else if (System.IO.File.Exists(cand2)) path = cand2;
+        }
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path)) return;
+
+        try
+        {
+            var json = System.IO.File.ReadAllText(path);
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            string S(string name) => root.TryGetProperty(name, out var el) && el.ValueKind == System.Text.Json.JsonValueKind.String ? (el.GetString() ?? "") : string.Empty;
+            bool? B(string name)
+            {
+                if (!root.TryGetProperty(name, out var el)) return null;
+                return el.ValueKind switch
+                {
+                    System.Text.Json.JsonValueKind.True => true,
+                    System.Text.Json.JsonValueKind.False => false,
+                    System.Text.Json.JsonValueKind.String => bool.TryParse(el.GetString(), out var v) ? v : (bool?)null,
+                    _ => null
+                };
+            }
+            int? I(string name)
+            {
+                if (!root.TryGetProperty(name, out var el)) return null;
+                if (el.ValueKind == System.Text.Json.JsonValueKind.Number && el.TryGetInt32(out var vi)) return vi;
+                if (el.ValueKind == System.Text.Json.JsonValueKind.String && int.TryParse(el.GetString(), out var vs)) return vs;
+                return null;
+            }
+
+            void Set(string env, string? val) { if (!string.IsNullOrWhiteSpace(val)) Environment.SetEnvironmentVariable(env, val); }
+            void SetB(string env, bool? val) { if (val.HasValue) Environment.SetEnvironmentVariable(env, val.Value ? "true" : "false"); }
+            void SetI(string env, int? val) { if (val.HasValue) Environment.SetEnvironmentVariable(env, val.Value.ToString()); }
+
+            Set("OPENAI_API_KEY", S("openai_api_key"));
+            Set("OPENAI_MODEL", S("openai_model"));
+            SetI("OPENAI_MAX_COMPLETION_TOKENS", I("max_tokens"));
+            SetI("OPENAI_HTTP_TIMEOUT_SECONDS", I("http_timeout_seconds"));
+
+            SetB("DRY_RUN", B("dry_run"));
+            SetB("SHOW_USAGE", B("show_usage"));
+            SetB("TREAT_REFUSAL_AS_ERROR", B("treat_refusal_as_error"));
+            SetB("DEMO_MODE", B("demo_mode"));
+            SetI("NODE_DETAIL_WORDS", I("node_detail_words"));
+            SetI("NODE_SUMMARY_WORDS", I("node_summary_words"));
+            SetB("DEBUG", B("debug"));
+            SetB("USE_RESPONSES_API", B("use_responses_api"));
+            SetB("ENABLE_WEB_SEARCH", B("enable_web_search"));
+            SetB("CACHE_SYSTEM_INPUT", B("cache_system_input"));
+            SetB("CACHE_BOOK_CONTEXT", B("cache_book_context"));
+            SetB("RESPONSES_STRICT_JSON", B("responses_strict_json"));
+            Set("OPENAI_BETA_HEADER", S("openai_beta_header"));
+
+            Set("INDEX_MD_PATH", S("index_md_path"));
+            SetB("CUSTOM_MD_BEAUTIFY", B("custom_md_beautify"));
+            SetB("STRIP_LINKS", B("strip_links"));
+
+            // Respuestas de inputs
+            Set("TARGET_AUDIENCE", S("target_audience"));
+            Set("TOPIC", S("topic"));
+            Set("DOC_TITLE", S("doc_title"));
+        }
+        catch
+        {
+            // Ignorar errores de parseo para no bloquear ejecución interactiva
         }
     }
 }

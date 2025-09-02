@@ -231,6 +231,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         if (string.IsNullOrWhiteSpace(content)) return content;
         var lines = content.Replace("\r\n", "\n").Split('\n');
         var result = new StringBuilder(content.Length + 64);
+        bool inCode = false;
 
         // Patrones globales para detectar líneas que repitan el encabezado del propio nodo
         var numEsc = Regex.Escape(number);
@@ -246,6 +247,43 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         for (int i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
+            var trimmedStart = line.TrimStart();
+
+            // Manejo de fences de código (``` o ~~~), incluso si vienen con prefijo accidental de '#'
+            var mFence = Regex.Match(line, @"^\s*(?:#{1,6}\s*)?(```|~~~)(.*)$");
+            if (mFence.Success)
+            {
+                var fence = mFence.Groups[1].Value; // ``` o ~~~
+                var after = mFence.Groups[2].Value;  // etiqueta opcional
+                var fenceLine = fence + after;
+
+                // Considerar que ya vimos contenido
+                if (!firstNonEmptyProcessed) firstNonEmptyProcessed = true;
+
+                if (!inCode)
+                {
+                    // Asegurar línea en blanco antes de abrir
+                    var res = result.ToString();
+                    if (res.Length > 0 && !res.EndsWith("\n\n")) result.AppendLine("");
+                    result.AppendLine(fenceLine);
+                    inCode = true;
+                }
+                else
+                {
+                    // Cierre y asegurar línea en blanco después si corresponde
+                    result.AppendLine(fenceLine);
+                    inCode = false;
+                    int j = i + 1;
+                    if (j < lines.Length && !string.IsNullOrWhiteSpace(lines[j])) result.AppendLine("");
+                }
+                continue;
+            }
+
+            if (inCode)
+            {
+                result.AppendLine(line);
+                continue;
+            }
 
             // Omitir espacios en blanco iniciales hasta ver la primera línea no vacía
             if (!firstNonEmptyProcessed && string.IsNullOrWhiteSpace(line))
@@ -316,8 +354,8 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                     bool looksLikeLabel = Regex.IsMatch(trimmed, @"^(Beneficios|Limitaciones|Consideraciones|Patrones(\s+y\s+t[eé]cnicas)?|T[eé]cnicas|Decisiones|Resumen(\s+pr[aá]ctico)?|Buenas\s+pr[aá]cticas|Checklist)\b", RegexOptions.IgnoreCase);
                     // Heurística de longitud (título breve)
                     int wordCount = Regex.Matches(trimmed, @"\S+").Count;
-                    bool shortTitle = wordCount > 0 && wordCount <= 9 && !trimmed.EndsWith(".");
-                    if (nextIsList || endsWithColon || looksLikeLabel)
+                    bool shortTitle = wordCount > 0 && wordCount <= 10 && !trimmed.EndsWith(".");
+                    if (shortTitle && (nextIsList || endsWithColon || looksLikeLabel))
                     {
                         var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
                         result.AppendLine(new string('#', internalLevel) + " " + trimmed.TrimEnd(':'));
