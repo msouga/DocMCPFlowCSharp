@@ -295,9 +295,8 @@ public class BookGenerator : IBookFlowOrchestrator
                 }
 
                 // Intentar capturar un sumario inline justo debajo del encabezado
-                // Regla: tomar uno o varios párrafos inmediatamente posteriores (ignorando líneas en blanco iniciales),
-                // hasta el próximo encabezado o un bloque de código. Se permiten líneas en blanco entre párrafos
-                // y viñetas simples; se recomienda que el sumario sea breve.
+                // Regla: tomar todo el texto inmediatamente posterior (ignorando líneas en blanco iniciales)
+                // hasta el PRÓXIMO ENCABEZADO o fin de archivo. Se permiten líneas en blanco, listas y bloques de código.
                 var sbSum = new System.Text.StringBuilder();
                 int k = i + 1;
                 // Saltar líneas en blanco iniciales entre el encabezado y el párrafo del resumen
@@ -307,9 +306,7 @@ public class BookGenerator : IBookFlowOrchestrator
                 {
                     var peek = lines[k];
                     if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+")) break; // siguiente encabezado
-                    var t = peek.TrimStart();
-                    if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^(?:```|~~~)")) break; // evitar capturar bloques de código
-                    // Aceptar líneas en blanco como separadores de párrafos dentro del sumario
+                    // Aceptar líneas en blanco, listas y bloques de código como parte del sumario
                     sbSum.AppendLine(peek.TrimEnd());
                     if (!string.IsNullOrWhiteSpace(peek)) sawAny = true;
                     k++;
