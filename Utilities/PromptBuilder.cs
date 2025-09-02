@@ -61,8 +61,9 @@ Contexto del Documento:
 Requisitos:
 - Escribe contenido técnico claro y preciso, adaptado al público.
 {targetWordsText}
-- La salida debe ser en formato Markdown.
- - Empieza directamente con el contenido, sin incluir ningún encabezado que repita el número o el título de la sección (p. ej.: ""#### {chapterNumber} — {chapterTitle}"", ""#### {chapterTitle}"").";
+ - La salida debe ser en formato Markdown.
+ - Empieza directamente con el contenido, sin incluir ningún encabezado que repita el número o el título de la sección (p. ej.: ""#### {chapterNumber} — {chapterTitle}"", ""#### {chapterTitle}"").
+ - No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").";
 
     private const string SubchapterContentPromptTemplate = @"Redacta el contenido del subcapítulo **{sectionNumber} — {sectionTitle}** en español y formato Markdown.
 
@@ -84,7 +85,8 @@ Requisitos:
 - Estructura clara. No incluyas el encabezado principal del subcapítulo (se añadirá externamente).
 - Para subsecciones internas usa como máximo encabezados de cuarto nivel (####). No uses niveles 5 o 6.
  - No repitas ni incluyas encabezados con el número o el título del subcapítulo (ej.: ""#### {sectionNumber} — {sectionTitle}"", ""#### {sectionTitle}""). Comienza directamente con el contenido.
-- Mantén coherencia y continuidad con el contenido previo si existe.";
+ - No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").
+ - Mantén coherencia y continuidad con el contenido previo si existe.";
 
     private const string ChapterOverviewPromptTemplate = @"Redacta el contenido del capítulo **{chapterNumber} — {chapterTitle}** en español y formato Markdown.
 
@@ -108,7 +110,8 @@ Requisitos:
 - Empieza directamente con el contenido, no repitas el título del capítulo.
 - No listes ni repitas títulos o numeraciones de subcapítulos (evita líneas como ""1.1 ..."", ""1.2 ..."").
 - No incluyas encabezados internos, listas, viñetas, bloques de código ni comandos.
-- Redacta 2 a 3 párrafos generales (120-200 palabras en total), de carácter conceptual y sin instrucciones paso a paso.
+ - Redacta 2 a 3 párrafos generales (120-200 palabras en total), de carácter conceptual y sin instrucciones paso a paso.
+ - No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").
 
     Ejemplo de estilo (no copiar literalmente): redactar 2 párrafos que enmarquen el capítulo a alto nivel, explicando cómo se relacionan los subtemas y qué decisiones o criterios importan, sin listas ni encabezados internos.";
 

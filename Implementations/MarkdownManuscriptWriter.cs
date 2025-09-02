@@ -195,6 +195,8 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                     content = ComposeChapterOverviewFallback(node);
                 }
             }
+            // Eliminar sugerencias/meta del asistente (p. ej. "Si quieres, puedo …") para que no aparezcan en el manual
+            content = StripAssistantMetaSuggestions(content);
             sb.AppendLine(content);
             // Insertar marcadores de gráficos sugeridos (visibles) al final de la sección
             if (node.Diagrams.Any())
@@ -292,6 +294,69 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             }
             if (!isLabel) result.AppendLine(line);
         }
+        return result.ToString().TrimEnd('\n');
+    }
+
+    // Quita bloques de "sugerencias del asistente" que no deben figurar en el manual,
+    // como frases del tipo "Si quieres, puedo …", "¿Quieres que …?", etc., y sus listas inmediatas.
+    private static string StripAssistantMetaSuggestions(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var result = new StringBuilder(content.Length);
+        bool inCode = false;
+        bool skippingSuggestionBlock = false;
+
+        // Patrones en ES y EN comunes de ofertas/preguntas meta
+        var triggers = new System.Text.RegularExpressions.Regex(
+            @"^(\s*(-\s+)?)?(si\s+quieres|si\s+prefieres|puedo\s+|podemos\s+|¿quieres\s+que|¿te\s+gustar[ií]a\s+que|if\s+you\s+want,?\s+i\s+can|would\s+you\s+like\s+me\s+to|i\s+can\s+provide)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        foreach (var raw in lines)
+        {
+            var line = raw;
+            var trimmed = line.TrimStart();
+
+            // Control de fences de código: no modificar dentro de bloques de código
+            if (trimmed.StartsWith("```") || trimmed.StartsWith("~~~"))
+            {
+                inCode = !inCode;
+                result.AppendLine(line);
+                continue;
+            }
+            if (inCode)
+            {
+                result.AppendLine(line);
+                continue;
+            }
+
+            if (!skippingSuggestionBlock && triggers.IsMatch(trimmed))
+            {
+                // Empezar a omitir desde esta línea y, si vienen bullets o líneas vacías, seguir omitiendo hasta un párrafo normal
+                skippingSuggestionBlock = true;
+                continue;
+            }
+
+            if (skippingSuggestionBlock)
+            {
+                // Mientras sea bullet/continuación o línea vacía, seguir omitiendo
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    // Mantener omisión a través de líneas en blanco; finaliza cuando aparezca un párrafo normal
+                    continue;
+                }
+                var isBullet = System.Text.RegularExpressions.Regex.IsMatch(line, @"^\s*([-*+]\s+|\d+\.\s+)");
+                if (isBullet)
+                {
+                    continue;
+                }
+                // Párrafo normal: dejar de omitir a partir de aquí
+                skippingSuggestionBlock = false;
+            }
+
+            result.AppendLine(line);
+        }
+
         return result.ToString().TrimEnd('\n');
     }
 
