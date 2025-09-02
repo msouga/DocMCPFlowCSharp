@@ -65,6 +65,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         fullText = CleanMarkdownArtifacts(fullText);
         if (_config.CustomBeautifyEnabled)
         {
+            fullText = EnsureSpaceAfterInlineHash(fullText);
             fullText = FixColonBacktickSpacing(fullText);
             fullText = BeautifyLists(fullText);
         }
@@ -112,6 +113,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             onlyChaptersText = CleanMarkdownArtifacts(onlyChaptersText);
             if (_config.CustomBeautifyEnabled)
             {
+                onlyChaptersText = EnsureSpaceAfterInlineHash(onlyChaptersText);
                 onlyChaptersText = FixColonBacktickSpacing(onlyChaptersText);
                 onlyChaptersText = BeautifyLists(onlyChaptersText);
             }
@@ -619,6 +621,67 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         text = text.TrimEnd('\n', '\r');
         text += "\n"; // asegurar fin de archivo con una sola nueva línea
         return text.Replace("\n", System.Environment.NewLine);
+    }
+
+    // Asegura un espacio después de '#' cuando forma parte de tokens como C#, F#, do#
+    // Regla: insertar espacio sólo si el siguiente carácter es una letra (no espacio ni . , : ;)
+    // Evita modificar dentro de fences de código (``` o ~~~)
+    private static string EnsureSpaceAfterInlineHash(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var sb = new StringBuilder(content.Length + 64);
+        bool inCode = false;
+
+        // Regla general: añadir espacio tras '#' cuando forme parte de una palabra pegada ("abc#x" -> "abc# x")
+        // EXCEPCIÓN: no tocar notación musical de notas/acordes, ej.: "F#5", "Do#7", "Do#m7", "G#", etc.
+        // Soporta raíces inglesas (A..G) y solfeo (do, re, mi, fa, sol, la, si).
+        var rxLetterOrDigit = new Regex(@"\b([A-Za-zÁÉÍÓÚÜáéíóúÑñ]+)#([A-Za-zÁÉÍÓÚÜáéíóúÑñ0-9])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        var rxHashAtEnd    = new Regex(@"\b([A-Za-zÁÉÍÓÚÜáéíóúÑñ]+)#\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        // TODO: Ampliar soporte si se requiere notación musical avanzada.
+        // - Raíces adicionales por idioma/sistema (p.ej., H, Hb, Si♭, etc.).
+        // - Calificadores extendidos (maj9, mMaj7, sus2/4, add11, dim7, aug#, ø, °).
+        // - Símbolos Unicode de sostenido/bemol (♯, ♭) y normalización.
+        // - Alteraciones compuestas (##, bb) y acordes con barra (C#/G).
+        // - Evitar falsos positivos en contextos no musicales.
+        var noteRoots = new HashSet<string>(new[]{
+            "a","b","c","d","e","f","g",
+            "do","re","mi","fa","sol","la","si"
+        }, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var raw in lines)
+        {
+            var line = raw;
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith("```") || trimmed.StartsWith("~~~"))
+            {
+                inCode = !inCode;
+                sb.AppendLine(line);
+                continue;
+            }
+            if (inCode)
+            {
+                sb.AppendLine(line);
+                continue;
+            }
+
+            // insertar espacio: "abc#x" -> "abc# x" salvo notación musical
+            line = rxLetterOrDigit.Replace(line, m => {
+                var left = m.Groups[1].Value;   // texto antes de '#'
+                var right = m.Groups[2].Value;  // primer char después de '#'
+                // Si 'left' es una raíz de nota, no tocar (ej. C#5, Do#m7)
+                if (noteRoots.Contains(left)) return m.Value;
+                return left + "# " + right;
+            });
+        // si termina en "xyz#" asegurar espacio antes de fin de línea (siempre, incluso si es nota musical)
+        line = rxHashAtEnd.Replace(line, m => {
+            var left = m.Groups[1].Value;
+            return left + "# ";
+        });
+            sb.AppendLine(line);
+        }
+
+        return sb.ToString().TrimEnd('\n').Replace("\n", System.Environment.NewLine);
     }
 
     // Reglas de embellecimiento de Markdown (extensible)
