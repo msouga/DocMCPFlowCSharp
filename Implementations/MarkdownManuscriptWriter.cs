@@ -62,6 +62,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         // Normalización global del documento: primero Markdig, luego reglas propias (opcionales)
         var fullText = fullManuscript.ToString();
         fullText = NormalizeWithMarkdig(fullText);
+        fullText = CleanMarkdownArtifacts(fullText);
         if (_config.CustomBeautifyEnabled)
         {
             fullText = FixColonBacktickSpacing(fullText);
@@ -108,6 +109,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             AppendContent(onlyChapters, spec.TableOfContents, 1, includeHeaders: true);
             var onlyChaptersText = onlyChapters.ToString();
             onlyChaptersText = NormalizeWithMarkdig(onlyChaptersText);
+            onlyChaptersText = CleanMarkdownArtifacts(onlyChaptersText);
             if (_config.CustomBeautifyEnabled)
             {
                 onlyChaptersText = FixColonBacktickSpacing(onlyChaptersText);
@@ -538,6 +540,30 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             // En caso de cualquier problema con Markdig, devolver el texto original
             return input;
         }
+    }
+
+    // Limpia artefactos comunes no deseados en Markdown final
+    private static string CleanMarkdownArtifacts(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var sb = new StringBuilder(content.Length);
+        var emptyRefRx = new Regex(@"^\s*\[\s*\]:\s*$", RegexOptions.Compiled);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (emptyRefRx.IsMatch(line))
+            {
+                // Omitir referencias vacías del tipo "[]: "
+                continue;
+            }
+            sb.AppendLine(line);
+        }
+        // Eliminar líneas en blanco finales repetidas
+        var text = sb.ToString();
+        text = text.TrimEnd('\n', '\r');
+        text += "\n"; // asegurar fin de archivo con una sola nueva línea
+        return text.Replace("\n", System.Environment.NewLine);
     }
 
     // Reglas de embellecimiento de Markdown (extensible)
