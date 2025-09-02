@@ -316,7 +316,8 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             // separarlo con salto de línea para no pegarlo al contenido anterior.
             if (!string.IsNullOrWhiteSpace(line) && !trimmedStart.StartsWith("#"))
             {
-                foreach (var marker in new[] { "###### ", "##### ", "#### ", "### ", "## ", "# " })
+                // Considerar solo marcadores de nivel >= 2 ("## ") para evitar confundir "C# " con encabezado
+                foreach (var marker in new[] { "###### ", "##### ", "#### ", "### ", "## " })
                 {
                     var idx = line.IndexOf(marker, StringComparison.Ordinal);
                     if (idx > 0)
