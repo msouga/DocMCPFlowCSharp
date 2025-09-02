@@ -42,8 +42,9 @@ public class OpenAiSdkLlmClient : ILlmClient
 
         try
         {
-            var preview = user.Length > 120 ? user.Substring(0, 120) + "…" : user;
-            _logger.LogInformation("OpenAI request → model={model}, maxTokens={maxTokens}, userPreview=\"{preview}\"", model, maxTokens, preview.Replace("\n", " "));
+            _logger.LogInformation("OpenAI Chat request → model={model}, maxTokens={maxTokens}", model, maxTokens);
+            _logger.LogInformation("OpenAI Chat SYSTEM prompt:\n{System}", system);
+            _logger.LogInformation("OpenAI Chat USER prompt:\n{User}", user);
         }
         catch { /* best-effort logging */ }
 
@@ -78,7 +79,7 @@ public class OpenAiSdkLlmClient : ILlmClient
                 // Fallback si el tipo de opciones no existe en esta versión
                 completion = await _client.CompleteChatAsync(messages);
             }
-            try { _logger.LogInformation("OpenAI response ← len={Len}", completion?.Content?[0]?.Text?.Length ?? 0); } catch { }
+            try { _logger.LogInformation("OpenAI Chat response (full text) ←\n{Text}", completion?.Content?[0]?.Text ?? string.Empty); } catch { }
             if (completion?.Content is null || completion.Content.Count == 0)
             {
                 return string.Empty;

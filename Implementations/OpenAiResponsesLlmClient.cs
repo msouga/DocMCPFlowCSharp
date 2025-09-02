@@ -146,8 +146,9 @@ public class OpenAiResponsesLlmClient : ILlmClient
             }
 
             var payload = root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
-            var preview = user.Length > 120 ? user.Substring(0, 120) + "…" : user;
-            _logger.LogInformation("Responses request → model={Model}, maxTokens={Max}, userPreview=\"{Preview}\"", model, maxTokens, preview.Replace("\n", " "));
+            _logger.LogInformation("Responses request → model={Model}, maxTokens={Max}", model, maxTokens);
+            _logger.LogInformation("Responses SYSTEM prompt:\n{System}", system);
+            _logger.LogInformation("Responses USER prompt:\n{User}", user);
 
             var resp = await _http.PostAsync("https://api.openai.com/v1/responses", new StringContent(payload, Encoding.UTF8, "application/json"));
             var body = await resp.Content.ReadAsStringAsync();
@@ -242,7 +243,7 @@ public class OpenAiResponsesLlmClient : ILlmClient
                                 if (c.TryGetProperty("type", out var typeEl) && typeEl.GetString() == "output_text")
                                 {
                                     var text = c.GetProperty("text").GetString() ?? string.Empty;
-                                    _logger.LogInformation("Responses response ← len={Len}", text.Length);
+                                    _logger.LogInformation("Responses response (full text) ←\n{Text}", text);
                                     return text;
                                 }
                             }
@@ -254,6 +255,7 @@ public class OpenAiResponsesLlmClient : ILlmClient
             {
                 _logger.LogWarning(ex, "No se pudo parsear la respuesta; devolviendo body");
             }
+            _logger.LogInformation("Responses response (raw body) ←\n{Body}", body);
             return body;
         }
         catch (Exception ex)

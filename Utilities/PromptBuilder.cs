@@ -217,8 +217,8 @@ Requisitos:
 
     private static string BuildTablesHint(string? summary)
     {
-        // Activable por ENABLE_TABLES=true (default true). Si está activo, pedimos usar tablas cuando sea útil;
-        // si el sumario sugiere tabla/comparativa/matriz/cuadro, reforzamos la instrucción.
+        // Activable por ENABLE_TABLES=true (default true). Si está activo, pedimos usar tablas cuando sea útil.
+        // Si el sumario sugiere explícitamente "tabla", "comparativa", "matriz" o "cuadro", reforzamos la instrucción.
         var enable = (Environment.GetEnvironmentVariable("ENABLE_TABLES") ?? "true").Trim().ToLowerInvariant() == "true";
         if (!enable) return string.Empty;
         var baseHint = "- Cuando sea útil, presenta comparativas o catálogos en tablas Markdown con encabezados claros. Evita tablas vacías o triviales.";

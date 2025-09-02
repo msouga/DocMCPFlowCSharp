@@ -13,4 +13,12 @@ El objetivo es que el lector entienda no solo la terminología, sino la filosof�
 Esta sección explica el cambio de paradigma que supone la nube frente al almacenamiento tradicional. Se detallan conceptos como escalabilidad elástica, redundancia geográfica y consumo basado en demanda, resaltando cómo estas características han transformado la forma en que se diseñan las aplicaciones modernas. Además, se abordan posibles desafíos, como la necesidad de conectividad permanente y los riesgos regulatorios asociados al manejo de datos en diferentes jurisdicciones. Una Tabla con los nonbres de los distintos almacenamientos de las distintas nubes
 
 #### 1.1.1 Conceptos básicos
+## Capítulo 2: Ejemplos y patrones de uso en C# 
+
+En este capítulo se presentan ejemplos prácticos y patrones de uso recomendados para integrar Azure Storage en aplicaciones C#. Se abordarán casos de uso comunes, como el almacenamiento de archivos, la gestión de datos no estructurados y la implementación de copias de seguridad. Cada sección incluirá fragmentos de código y explicaciones detalladas para facilitar la comprensión.
+
+### 2.1 Almacenamiento de blobs
+
+
+### 2.2 Almacenamiento de archivos
 
