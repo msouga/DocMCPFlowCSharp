@@ -181,7 +181,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             var content = node.Content ?? string.Empty;
             // Sanitizar encabezados internos: ajustarlos a un nivel relativo al encabezado del nodo
             // y evitar duplicar el título del propio nodo.
-            content = SanitizeInternalHeadings(content, node.Number, node.Title, headerLevel);
+            content = SanitizeInternalHeadings(content, node.Number, node.Title, headerLevel, isLeaf: !node.SubChapters.Any());
             if (_config.CustomBeautifyEnabled)
             {
                 // Asegurar separación entre ':' y la siguiente que inicia con backticks
@@ -226,10 +226,9 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         }
     }
 
-    private static string SanitizeInternalHeadings(string content, string number, string title, int parentHeaderLevel)
+    private static string SanitizeInternalHeadings(string content, string number, string title, int parentHeaderLevel, bool isLeaf)
     {
         if (string.IsNullOrWhiteSpace(content)) return content;
-
         var lines = content.Replace("\r\n", "\n").Split('\n');
         var result = new StringBuilder(content.Length + 64);
 
@@ -244,9 +243,9 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         };
 
         bool firstNonEmptyProcessed = false;
-        foreach (var raw in lines)
+        for (int i = 0; i < lines.Length; i++)
         {
-            var line = raw;
+            var line = lines[i];
 
             // Omitir espacios en blanco iniciales hasta ver la primera línea no vacía
             if (!firstNonEmptyProcessed && string.IsNullOrWhiteSpace(line))
@@ -298,6 +297,33 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 line = new string('#', internalLevel) + " " + text;
                 result.AppendLine(line);
                 continue;
+            }
+
+            // Heurística para hojas: líneas cortas que actúan como encabezado para una lista posterior
+            if (isLeaf)
+            {
+                string trimmed = line.Trim();
+                if (!string.IsNullOrEmpty(trimmed) && !trimmed.StartsWith("#") && !trimmed.StartsWith("- ") && !trimmed.StartsWith("* ") && !Regex.IsMatch(trimmed, @"^\d+\.\s+"))
+                {
+                    // Buscar próxima línea no vacía
+                    int j = i + 1;
+                    string nextNonEmpty = string.Empty;
+                    while (j < lines.Length && string.IsNullOrWhiteSpace(lines[j])) j++;
+                    if (j < lines.Length) nextNonEmpty = lines[j].TrimStart();
+                    bool nextIsList = Regex.IsMatch(nextNonEmpty, @"^(?:[-*+]\s+|\d+\.\s+)");
+                    bool endsWithColon = trimmed.EndsWith(":");
+                    // Lista de palabras clave comunes de rótulos
+                    bool looksLikeLabel = Regex.IsMatch(trimmed, @"^(Beneficios|Limitaciones|Consideraciones|Patrones(\s+y\s+t[eé]cnicas)?|T[eé]cnicas|Decisiones|Resumen(\s+pr[aá]ctico)?|Buenas\s+pr[aá]cticas|Checklist)\b", RegexOptions.IgnoreCase);
+                    // Heurística de longitud (título breve)
+                    int wordCount = Regex.Matches(trimmed, @"\S+").Count;
+                    bool shortTitle = wordCount > 0 && wordCount <= 9 && !trimmed.EndsWith(".");
+                    if (nextIsList || endsWithColon || looksLikeLabel)
+                    {
+                        var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
+                        result.AppendLine(new string('#', internalLevel) + " " + trimmed.TrimEnd(':'));
+                        continue;
+                    }
+                }
             }
 
             result.AppendLine(line);
