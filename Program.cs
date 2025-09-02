@@ -137,6 +137,7 @@ internal class Program
         lines.Add($"DEBUG: {mark("DEBUG", valBool(config.DebugLogging))}");
         lines.Add($"USE_RESPONSES_API: {mark("USE_RESPONSES_API", valBool(config.UseResponsesApi))}");
         lines.Add($"ENABLE_WEB_SEARCH: {mark("ENABLE_WEB_SEARCH", valBool(config.EnableWebSearch))}");
+        lines.Add($"ENABLE_TABLES: {mark("ENABLE_TABLES", valBool(config.EnableTables))}");
         lines.Add($"CACHE_SYSTEM_INPUT: {mark("CACHE_SYSTEM_INPUT", valBool(config.CacheSystemInput))}");
         lines.Add($"CACHE_BOOK_CONTEXT: {mark("CACHE_BOOK_CONTEXT", valBool(config.CacheBookContext))}");
         lines.Add($"RESPONSES_STRICT_JSON: {mark("RESPONSES_STRICT_JSON", valBool(config.ResponsesStrictJson))}");

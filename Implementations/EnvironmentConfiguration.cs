@@ -28,4 +28,5 @@ public class EnvironmentConfiguration : IConfiguration
     public string? IndexMdPath => Environment.GetEnvironmentVariable("INDEX_MD_PATH");
     public bool CustomBeautifyEnabled => (Environment.GetEnvironmentVariable("CUSTOM_MD_BEAUTIFY") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool StripLinks => (Environment.GetEnvironmentVariable("STRIP_LINKS") ?? "false").Trim().ToLowerInvariant() == "true";
+    public bool EnableTables => (Environment.GetEnvironmentVariable("ENABLE_TABLES") ?? "true").Trim().ToLowerInvariant() == "true";
 }

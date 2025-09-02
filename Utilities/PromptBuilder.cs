@@ -61,9 +61,10 @@ Contexto del Documento:
 Requisitos:
 - Escribe contenido técnico claro y preciso, adaptado al público.
 {targetWordsText}
- - La salida debe ser en formato Markdown.
- - Empieza directamente con el contenido, sin incluir ningún encabezado que repita el número o el título de la sección (p. ej.: ""#### {chapterNumber} — {chapterTitle}"", ""#### {chapterTitle}"").
- - No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").";
+- La salida debe ser en formato Markdown.
+- Empieza directamente con el contenido, sin incluir ningún encabezado que repita el número o el título de la sección (p. ej.: ""#### {chapterNumber} — {chapterTitle}"", ""#### {chapterTitle}"").
+- No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").
+{tablesHint}";
 
     private const string SubchapterContentPromptTemplate = @"Redacta el contenido del subcapítulo **{sectionNumber} — {sectionTitle}** en español y formato Markdown.
 
@@ -84,9 +85,10 @@ Requisitos:
 {targetWordsText}
 - Estructura clara. No incluyas el encabezado principal del subcapítulo (se añadirá externamente).
 - Para subsecciones internas usa como máximo encabezados de cuarto nivel (####). No uses niveles 5 o 6.
- - No repitas ni incluyas encabezados con el número o el título del subcapítulo (ej.: ""#### {sectionNumber} — {sectionTitle}"", ""#### {sectionTitle}""). Comienza directamente con el contenido.
- - No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").
- - Mantén coherencia y continuidad con el contenido previo si existe.";
+- No repitas ni incluyas encabezados con el número o el título del subcapítulo (ej.: ""#### {sectionNumber} — {sectionTitle}"", ""#### {sectionTitle}""). Comienza directamente con el contenido.
+- No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").
+- Mantén coherencia y continuidad con el contenido previo si existe.
+{tablesHint}";
 
     private const string ChapterOverviewPromptTemplate = @"Redacta el contenido del capítulo **{chapterNumber} — {chapterTitle}** en español y formato Markdown.
 
@@ -161,6 +163,7 @@ Requisitos:
     public static string GetChapterPrompt(string title, string topic, string audience, string fullToc, ChapterNode node, string parentSummary, int targetWords)
     {
         var targetWordsText = targetWords > 0 ? $"- El objetivo de extensión es de {targetWords} palabras." : "";
+        var tablesHint = BuildTablesHint(node.Summary);
         return ChapterPromptTemplate
             .Replace("{chapterNumber}", node.Number)
             .Replace("{chapterTitle}", node.Title)
@@ -169,7 +172,8 @@ Requisitos:
             .Replace("{audience}", audience)
             .Replace("{summary}", node.Summary)
             .Replace("{parentSummary}", parentSummary)
-            .Replace("{targetWordsText}", targetWordsText);
+            .Replace("{targetWordsText}", targetWordsText)
+            .Replace("{tablesHint}", tablesHint);
     }
 
     public static string GetSubchapterContentPrompt(
@@ -196,6 +200,7 @@ Requisitos:
         }
 
         var targetWordsText = targetWords > 0 ? $"- Extensión objetivo: {targetWords} palabras." : "";
+        var tablesHint = BuildTablesHint(subchapter.Summary);
         return SubchapterContentPromptTemplate
             .Replace("{sectionNumber}", subchapter.Number)
             .Replace("{sectionTitle}", subchapter.Title)
@@ -206,7 +211,25 @@ Requisitos:
             .Replace("{currentMainSummary}", string.IsNullOrWhiteSpace(parentChapter.Summary) ? "(ninguno)" : parentChapter.Summary)
             .Replace("{subchapterSummaries}", subSummaries.ToString())
             .Replace("{previousSiblingContent}", string.IsNullOrWhiteSpace(prevSiblingContent) ? "(sin contenido previo)" : prevSiblingContent)
-            .Replace("{targetWordsText}", targetWordsText);
+            .Replace("{targetWordsText}", targetWordsText)
+            .Replace("{tablesHint}", tablesHint);
+    }
+
+    private static string BuildTablesHint(string? summary)
+    {
+        // Activable por ENABLE_TABLES=true (default true). Si está activo, pedimos usar tablas cuando sea útil;
+        // si el sumario sugiere tabla/comparativa/matriz/cuadro, reforzamos la instrucción.
+        var enable = (Environment.GetEnvironmentVariable("ENABLE_TABLES") ?? "true").Trim().ToLowerInvariant() == "true";
+        if (!enable) return string.Empty;
+        var baseHint = "- Cuando sea útil, presenta comparativas o catálogos en tablas Markdown con encabezados claros. Evita tablas vacías o triviales.";
+        if (string.IsNullOrWhiteSpace(summary)) return "\n" + baseHint;
+        var s = summary.ToLowerInvariant();
+        bool suggest = s.Contains("tabla") || s.Contains("tablas") || s.Contains("cuadro comparativo") || s.Contains("comparativa") || s.Contains("matriz") || s.Contains("cuadro");
+        if (suggest)
+        {
+            return "\n" + baseHint + "\n- El sumario sugiere una tabla: incluye al menos una tabla Markdown bien formada (| header | ...) con columnas acordes al texto.";
+        }
+        return "\n" + baseHint;
     }
 
     public static string GetChapterOverviewPrompt(

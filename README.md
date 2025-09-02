@@ -35,6 +35,7 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
      export DEBUG=true                        # opcional (true: Info+Debug; false: solo Warning+Error)
      export USE_RESPONSES_API=false           # opcional (true usa /v1/responses con caché de input)
      export ENABLE_WEB_SEARCH=false           # opcional (true añade herramienta de búsqueda; requiere USE_RESPONSES_API=true)
+     export ENABLE_TABLES=true               # opcional (true permite y fomenta tablas Markdown cuando aportan valor)
      export CACHE_SYSTEM_INPUT=true           # opcional (cachea el system prompt)
      export CACHE_BOOK_CONTEXT=true           # opcional (cachea contexto del libro por corrida)
      export RESPONSES_STRICT_JSON=false       # opcional (usa text.format para forzar JSON)
@@ -73,6 +74,7 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
 - `INDEX_MD_PATH`: ruta a un archivo Markdown con el índice (opcional). Si se define, el programa carga el título (H1) y la estructura (H2=capítulos, H3=subcapítulos, H4=sub-sub, etc.) desde el archivo y omite la generación de índice por LLM o demo.
 - `CUSTOM_MD_BEAUTIFY`: si `true` aplica reglas propias de embellecido (espaciado de listas, etc.) además de la normalización obligatoria con Markdig. Si `false`, solo se ejecuta Markdig. Por defecto `true`.
 - `STRIP_LINKS`: si `true`, elimina hipervínculos del manual (convierte `[texto](url)` en `texto` y borra URLs sueltas/autolinks). Útil para impresión.
+ - `ENABLE_TABLES`: si `true` (por defecto), las plantillas fomentan generar tablas Markdown cuando son útiles; si el sumario lo sugiere (p. ej., “comparativa”, “tabla”), se refuerza la instrucción.
 
 ## Archivo de parámetros de ejecución (opcional)
 

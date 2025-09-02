@@ -22,4 +22,5 @@ public interface IConfiguration
     string? IndexMdPath { get; }
     bool CustomBeautifyEnabled { get; }
     bool StripLinks { get; }
+    bool EnableTables { get; }
 }
