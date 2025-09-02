@@ -718,10 +718,14 @@ public class BookGenerator : IBookFlowOrchestrator
         var suggestions = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
         if (string.IsNullOrWhiteSpace(suggestions)) suggestions = "(No se generaron sugerencias de gráficos)";
 
+        // Construir apéndice con fuentes citadas por sección (best-effort)
+        var appendix = BuildSourcesAppendix();
+        var finalDoc = string.IsNullOrWhiteSpace(appendix) ? suggestions : suggestions + "\n\n" + appendix;
+
         if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
         {
             var path = System.IO.Path.Combine(RunContext.BackRunDirectory, "graficos_sugeridos.md");
-            await System.IO.File.WriteAllTextAsync(path, suggestions, Encoding.UTF8);
+            await System.IO.File.WriteAllTextAsync(path, finalDoc, Encoding.UTF8);
             _logger.LogInformation("Sugerencias de gráficos guardadas en: {Path}", path);
         }
     }
@@ -748,5 +752,69 @@ public class BookGenerator : IBookFlowOrchestrator
             };
             node.Diagrams.Add(diag);
         }
+    }
+
+    private string BuildSourcesAppendix()
+    {
+        var sb = new StringBuilder();
+        var any = false;
+        sb.AppendLine("## Apéndice: Fuentes citadas por sección");
+        void Collect(List<ChapterNode> nodes)
+        {
+            foreach (var n in nodes)
+            {
+                var urls = ExtractSourcesFromContent(n.Content ?? string.Empty);
+                if (urls.Count > 0)
+                {
+                    any = true;
+                    sb.AppendLine($"- {n.Number} {n.Title}");
+                    foreach (var u in urls)
+                    {
+                        sb.AppendLine($"  - {u}");
+                    }
+                }
+                if (n.SubChapters.Any()) Collect(n.SubChapters);
+            }
+        }
+        Collect(_spec.TableOfContents);
+        return any ? sb.ToString().TrimEnd() : string.Empty;
+    }
+
+    private static List<string> ExtractSourcesFromContent(string content)
+    {
+        var urls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(content)) return new List<string>();
+        var text = content.Replace("\r\n", "\n");
+        // Heurística 1: capturar URLs bajo una sección llamada 'Fuentes'
+        var lines = text.Split('\n');
+        bool inSources = false; int budget = 0;
+        var urlRx = new System.Text.RegularExpressions.Regex(@"https?://[^\s\)\]]+", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var l = lines[i];
+            if (System.Text.RegularExpressions.Regex.IsMatch(l, @"^\s*#{1,6}\s+Fuentes\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+                System.Text.RegularExpressions.Regex.IsMatch(l, @"^\s*Fuentes\s*:?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                inSources = true; budget = 40; // leer hasta 40 líneas después del encabezado
+                continue;
+            }
+            if (inSources)
+            {
+                var m = urlRx.Matches(l);
+                foreach (System.Text.RegularExpressions.Match mm in m) urls.Add(mm.Value);
+                budget--;
+                if (budget <= 0 || System.Text.RegularExpressions.Regex.IsMatch(l, @"^\s*#{1,6}\s+")) inSources = false;
+            }
+        }
+        // Heurística 2: si no se encontró sección 'Fuentes', capturar URLs globales (máx 5)
+        if (urls.Count == 0)
+        {
+            foreach (System.Text.RegularExpressions.Match m in urlRx.Matches(text))
+            {
+                urls.Add(m.Value);
+                if (urls.Count >= 5) break;
+            }
+        }
+        return urls.ToList();
     }
 }
