@@ -226,6 +226,8 @@ public class OpenAiResponsesLlmClient : ILlmClient
             }
 
             // La estructura de salida de Responses incluye 'output' con items; tomar el primer textual.
+            // Antes, intentar registrar señales de uso de herramientas (web_search, etc.).
+            try { LogToolSignals(body); } catch { /* best-effort */ }
             try
             {
                 using var doc = JsonDocument.Parse(body);
@@ -259,6 +261,46 @@ public class OpenAiResponsesLlmClient : ILlmClient
             _ui.WriteLine($"Ocurrió un error al llamar a Responses API: {ex.Message}", ConsoleColor.Red);
             _logger.LogError(ex, "Responses API call failed");
             return string.Empty;
+        }
+    }
+
+    private void LogToolSignals(string body)
+    {
+        using var doc = JsonDocument.Parse(body);
+        int anyTool = 0, webCalls = 0;
+        void Scan(JsonElement el)
+        {
+            switch (el.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    string? name = null; string? type = null;
+                    bool toolish = false;
+                    foreach (var prop in el.EnumerateObject())
+                    {
+                        if (prop.NameEquals("name")) name = prop.Value.GetString();
+                        else if (prop.NameEquals("type")) type = prop.Value.GetString();
+                        else if (prop.NameEquals("tool") || prop.NameEquals("tool_use") || prop.NameEquals("tool_call") || prop.NameEquals("tool_result")) toolish = true;
+                    }
+                    if (!string.IsNullOrEmpty(name) && (toolish || type == "tool_use" || type == "tool_call" || type == "tool_result"))
+                    {
+                        anyTool++;
+                        if (string.Equals(name, "web_search", StringComparison.OrdinalIgnoreCase)) webCalls++;
+                    }
+                    foreach (var prop in el.EnumerateObject()) Scan(prop.Value);
+                    break;
+                case JsonValueKind.Array:
+                    foreach (var item in el.EnumerateArray()) Scan(item);
+                    break;
+            }
+        }
+        Scan(doc.RootElement);
+        if (anyTool > 0)
+        {
+            _logger.LogInformation("Responses tools used: total={Any}, web_search={Web}", anyTool, webCalls);
+        }
+        else if (body.IndexOf("web_search", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            _logger.LogInformation("Responses body references 'web_search' (no structured tool signals parsed)");
         }
     }
 
