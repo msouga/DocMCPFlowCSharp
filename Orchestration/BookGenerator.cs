@@ -721,8 +721,8 @@ public class BookGenerator : IBookFlowOrchestrator
         // Construir apéndice con fuentes citadas por sección (best-effort)
         var appendix = BuildSourcesAppendix();
         var finalDoc = string.IsNullOrWhiteSpace(appendix) ? suggestions : suggestions + "\n\n" + appendix;
-        // Asegurar formato correcto de fences: línea en blanco antes de ``` o ~~~
-        finalDoc = EnsureBlankLineBeforeFences(finalDoc);
+        // Asegurar formato correcto de fences: línea en blanco antes de abrir y después de cerrar
+        finalDoc = EnsureFencesSpacing(finalDoc);
 
         if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
         {
@@ -820,28 +820,74 @@ public class BookGenerator : IBookFlowOrchestrator
         return urls.ToList();
     }
 
-    private static string EnsureBlankLineBeforeFences(string content)
+    private static string EnsureFencesSpacing(string content)
     {
         if (string.IsNullOrEmpty(content)) return content;
         var nl = "\n";
         var lines = content.Replace("\r\n", "\n").Split('\n');
-        var sb = new StringBuilder(content.Length + 64);
-        bool first = true;
-        string prevEmitted = string.Empty;
-        foreach (var line in lines)
+        var sb = new StringBuilder(content.Length + 128);
+        bool inFence = false;
+        for (int i = 0; i < lines.Length; i++)
         {
+            var line = lines[i];
             var trimmed = line.TrimStart();
             bool isFence = trimmed.StartsWith("```") || trimmed.StartsWith("~~~");
-            if (!first && isFence && !string.IsNullOrWhiteSpace(prevEmitted))
+
+            if (isFence)
             {
-                // Insertar una línea en blanco antes del fence
-                sb.Append(nl);
-                prevEmitted = string.Empty; // para no insertar más de una
+                // Asegurar línea en blanco ANTES de abrir fence
+                if (!inFence)
+                {
+                    // Mirar lo último emitido; si no está en inicio y la última línea no es en blanco, insertar en blanco
+                    if (sb.Length > 0)
+                    {
+                        // Obtener último carácter diferente de \n
+                        int len = sb.Length;
+                        bool lastIsNewline = len > 0 && sb[len - 1] == '\n';
+                        if (!lastIsNewline)
+                        {
+                            sb.Append(nl);
+                        }
+                        else
+                        {
+                            // Ya hay al menos un salto; verificar si hay línea en blanco
+                            // Tomar penúltimo salto si existe
+                            int lastNl = sb.ToString().LastIndexOf('\n');
+                            int prevNl = lastNl > 0 ? sb.ToString().LastIndexOf('\n', lastNl - 1) : -1;
+                            if (prevNl >= 0 && lastNl - prevNl <= 1)
+                            {
+                                // ya hay una línea en blanco
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Estamos cerrando un fence (toggle a false más abajo)
+                }
+                sb.Append(line).Append(nl);
+                // Toggle estado fence
+                inFence = !inFence;
+
+                // Si acabamos de CERRAR el fence (inFence ahora false), asegurar línea en blanco DESPUÉS
+                if (!inFence)
+                {
+                    // Mirar siguiente línea; si existe y no es en blanco, insertar en blanco
+                    if (i + 1 < lines.Length)
+                    {
+                        var next = lines[i + 1];
+                        if (!string.IsNullOrWhiteSpace(next)) sb.Append(nl);
+                    }
+                    else
+                    {
+                        // Al final del documento, agregar un salto final
+                        sb.Append(nl);
+                    }
+                }
+                continue;
             }
-            sb.Append(line);
-            sb.Append(nl);
-            prevEmitted = line;
-            first = false;
+
+            sb.Append(line).Append(nl);
         }
         return sb.ToString().TrimEnd('\n');
     }

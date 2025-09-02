@@ -263,8 +263,33 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             if (Regex.IsMatch(line, @"^\s*#{1,6}\s+"))
             {
                 var text = Regex.Replace(line, @"^\s*#{1,6}\s+", "").TrimEnd();
+                // Quitar prefijos numéricos del texto del encabezado (p. ej. "1.1 Título" → "Título")
+                text = Regex.Replace(text, @"^\s*(?:\d+(?:\.\d+)*)\s+", "");
                 var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
                 line = new string('#', internalLevel) + " " + text;
+                result.AppendLine(line);
+                continue;
+            }
+
+            // Convertir líneas que son rótulos de sección con numeración en encabezados internos
+            var mNum = Regex.Match(line, @"^\s*(\d+(?:\.\d+)*)\s+(\S.*)$");
+            if (mNum.Success)
+            {
+                var text = mNum.Groups[2].Value.TrimEnd();
+                var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
+                line = new string('#', internalLevel) + " " + text;
+                result.AppendLine(line);
+                continue;
+            }
+
+            // Opcional: etiquetas comunes sin numeración que suelen ser rótulos
+            if (Regex.IsMatch(line.Trim(), @"^(Descripci[oó]n\s+general|Resumen|Introducci[oó]n)\s*$", RegexOptions.IgnoreCase))
+            {
+                var text = line.Trim();
+                var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
+                line = new string('#', internalLevel) + " " + text;
+                result.AppendLine(line);
+                continue;
             }
 
             result.AppendLine(line);
