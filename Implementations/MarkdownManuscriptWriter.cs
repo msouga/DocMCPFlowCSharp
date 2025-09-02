@@ -548,7 +548,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         if (string.IsNullOrWhiteSpace(content)) return content;
         var lines = content.Replace("\r\n", "\n").Split('\n');
         var sb = new StringBuilder(content.Length);
-        var emptyRefRx = new Regex(@"^\s*\[\s*\]:\s*$", RegexOptions.Compiled);
+        var emptyRefRx = new Regex(@"^\s*\[\s*\]\s*:\s*.*$", RegexOptions.Compiled);
         for (int i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
