@@ -22,6 +22,8 @@ coverage*/
 manuscrito.md
 manuscrito_capitulos.md
 configurar_entorno.sh
+executionparameters.config
+executionparameters.json
 
 back/
 ultimo-log.txt
