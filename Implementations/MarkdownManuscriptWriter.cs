@@ -39,7 +39,9 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         // 2. Introduction
         fullManuscript.AppendLine("## Introducción");
         fullManuscript.AppendLine();
-        fullManuscript.AppendLine(spec.Introduction);
+        var introText = spec.Introduction ?? string.Empty;
+        if (_config.StripLinks) introText = StripLinksForPrint(introText);
+        fullManuscript.AppendLine(introText);
         fullManuscript.AppendLine();
 
         // 3. Table of Contents
@@ -151,7 +153,9 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             if (!string.IsNullOrWhiteSpace(node.Summary))
             {
                 sb.AppendLine($"### {node.Number} {node.Title}");
-                sb.AppendLine(node.Summary);
+                var sum = node.Summary ?? string.Empty;
+                if (_config.StripLinks) sum = StripLinksForPrint(sum);
+                sb.AppendLine(sum);
                 sb.AppendLine();
             }
             if (node.SubChapters.Any())
@@ -184,6 +188,10 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 content = FixColonBacktickSpacing(content);
                 // Mejorar legibilidad de listas con líneas en blanco estratégicas
                 content = BeautifyLists(content);
+            }
+            if (_config.StripLinks)
+            {
+                content = StripLinksForPrint(content);
             }
             // Si es un capítulo con subcapítulos, impedir que el overview duplique rótulos de subcapítulos
             if (level == 1 && node.SubChapters.Any())
@@ -540,5 +548,40 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         }
 
         return result.ToString().TrimEnd('\n').Replace("\n", System.Environment.NewLine);
+    }
+
+    private static string StripLinksForPrint(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var sb = new StringBuilder(content.Length);
+        bool inCode = false;
+        var linkRx = new Regex(@"\[([^\]]+)\]\((https?://[^\s)]+)\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        var autoLinkRx = new Regex(@"<https?://[^>]+>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        var bareUrlRx = new Regex(@"https?://[^\s)\]]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        foreach (var raw in lines)
+        {
+            var line = raw;
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith("```") || trimmed.StartsWith("~~~"))
+            {
+                inCode = !inCode;
+                sb.AppendLine(line);
+                continue;
+            }
+            if (inCode)
+            {
+                sb.AppendLine(line);
+                continue;
+            }
+            // [text](url) -> text
+            line = linkRx.Replace(line, "$1");
+            // <http://...> -> ''
+            line = autoLinkRx.Replace(line, "");
+            // bare urls -> ''
+            line = bareUrlRx.Replace(line, "");
+            sb.AppendLine(line);
+        }
+        return sb.ToString().TrimEnd('\n');
     }
 }

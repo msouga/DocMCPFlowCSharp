@@ -21,4 +21,5 @@ public interface IConfiguration
     bool ResponsesStrictJson { get; }
     string? IndexMdPath { get; }
     bool CustomBeautifyEnabled { get; }
+    bool StripLinks { get; }
 }

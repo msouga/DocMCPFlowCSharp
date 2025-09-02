@@ -38,6 +38,7 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
      export CACHE_SYSTEM_INPUT=true           # opcional (cachea el system prompt)
      export CACHE_BOOK_CONTEXT=true           # opcional (cachea contexto del libro por corrida)
      export RESPONSES_STRICT_JSON=false       # opcional (usa text.format para forzar JSON)
+     export STRIP_LINKS=false                 # opcional (true elimina hipervínculos del manual para impresión)
      # Opcionales para ejecución no interactiva (evita prompts):
      export TARGET_AUDIENCE="Programadores C# intermedios"
      export TOPIC="Azure Storage práctico desde C#"
@@ -71,6 +72,7 @@ CLI en C# (.NET 9) para orquestar la generación de libros/manuscritos usando mo
 - `CACHE_BOOK_CONTEXT`: si `true`, cachea un bloque estable por corrida (título, público, tema y TOC).
 - `INDEX_MD_PATH`: ruta a un archivo Markdown con el índice (opcional). Si se define, el programa carga el título (H1) y la estructura (H2=capítulos, H3=subcapítulos, H4=sub-sub, etc.) desde el archivo y omite la generación de índice por LLM o demo.
 - `CUSTOM_MD_BEAUTIFY`: si `true` aplica reglas propias de embellecido (espaciado de listas, etc.) además de la normalización obligatoria con Markdig. Si `false`, solo se ejecuta Markdig. Por defecto `true`.
+ - `STRIP_LINKS`: si `true`, elimina hipervínculos del manual (convierte `[texto](url)` en `texto` y borra URLs sueltas/autolinks). Útil para impresión.
  - `TARGET_AUDIENCE` y `TOPIC`: si se definen, el programa no te los pedirá por consola. Útiles para ejecución desatendida.
  - `DOC_TITLE`: si no usas `INDEX_MD_PATH`, puedes precargar el título con esta variable.
 

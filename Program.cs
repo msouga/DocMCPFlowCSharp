@@ -143,6 +143,7 @@ internal class Program
         lines.Add($"INDEX_MD_PATH: {mark("INDEX_MD_PATH", idx)}");
         lines.Add($"CUSTOM_MD_BEAUTIFY: {mark("CUSTOM_MD_BEAUTIFY", valBool(config.CustomBeautifyEnabled))}");
         lines.Add($"PrevChapterTailChars: {config.PrevChapterTailChars} (Default)");
+        lines.Add($"STRIP_LINKS: {mark("STRIP_LINKS", config.StripLinks ? "true" : "false")}");
         var ta = Environment.GetEnvironmentVariable("TARGET_AUDIENCE");
         var tp = Environment.GetEnvironmentVariable("TOPIC");
         var dt = Environment.GetEnvironmentVariable("DOC_TITLE");

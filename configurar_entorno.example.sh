@@ -54,6 +54,7 @@ export CACHE_SYSTEM_INPUT="${CACHE_SYSTEM_INPUT:-true}"
 export CACHE_BOOK_CONTEXT="${CACHE_BOOK_CONTEXT:-true}"
 export RESPONSES_STRICT_JSON="${RESPONSES_STRICT_JSON:-false}"
 export ENABLE_WEB_SEARCH="${ENABLE_WEB_SEARCH:-false}"   # si true y USE_RESPONSES_API=true, habilita herramienta de búsqueda web
+export STRIP_LINKS="${STRIP_LINKS:-false}"               # si true, elimina hipervínculos del manual (impresión)
 
 # Si deseas cargar el índice desde un archivo Markdown en vez de generarlo:
 #   Formato: H1 título, H2 capítulos, H3 subcapítulos, H4 sub-sub.

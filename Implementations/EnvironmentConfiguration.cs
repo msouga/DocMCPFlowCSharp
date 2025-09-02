@@ -27,4 +27,5 @@ public class EnvironmentConfiguration : IConfiguration
     public bool ResponsesStrictJson => (Environment.GetEnvironmentVariable("RESPONSES_STRICT_JSON") ?? "false").Trim().ToLowerInvariant() == "true";
     public string? IndexMdPath => Environment.GetEnvironmentVariable("INDEX_MD_PATH");
     public bool CustomBeautifyEnabled => (Environment.GetEnvironmentVariable("CUSTOM_MD_BEAUTIFY") ?? "true").Trim().ToLowerInvariant() == "true";
+    public bool StripLinks => (Environment.GetEnvironmentVariable("STRIP_LINKS") ?? "false").Trim().ToLowerInvariant() == "true";
 }
