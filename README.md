@@ -145,11 +145,12 @@ La autenticación se realiza mediante la variable `OPENAI_API_KEY`. El cliente `
 - Modelos: puedes cambiar el modelo con `OPENAI_MODEL`.
 - Límite de tokens: se aplica de forma best‑effort según la versión del SDK `OpenAI`. El cliente intenta usar `ChatCompletionOptions` y establecer `MaxOutputTokens`/`MaxTokens` si existen; si no, continúa sin límite explícito.
  - Responses API: para gpt-5 / gpt-5-mini / gpt-5-nano puedes activar `USE_RESPONSES_API=true` y aprovechar caché de input efímero (puede requerir un header beta, ver `OPENAI_BETA_HEADER`). Asegúrate de que el system/contexto estable no cambie entre llamadas para maximizar hits.
- - Índice por archivo: si defines `INDEX_MD_PATH`, usa un `.md` con:
+  - Índice por archivo: si defines `INDEX_MD_PATH`, usa un `.md` con:
    - `# Título del documento`
    - `## Capítulo`
    - `### Subcapítulo`
    - `#### Sub-sub` (opcional)
+   - Opcional: un párrafo de resumen inmediatamente debajo de cualquier encabezado será tomado como el “sumario” de esa sección y NO se generará uno nuevo (se respeta tal cual).
    El título se precarga del H1 y el índice se toma de los encabezados. Puedes poner numeraciones en los H2/H3/H4, pero el parser las limpia y conserva solo el texto. También elimina el prefijo “Capítulo N:” en H2. Luego el programa genera resúmenes y contenido igual que en el flujo normal.
 
 ## Búsqueda Web y citas (opcional)

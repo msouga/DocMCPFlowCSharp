@@ -252,15 +252,15 @@ public class BookGenerator : IBookFlowOrchestrator
             _logger.LogDebug("Preview índice (primeras 25 líneas):\n{Preview}", preview);
             var toc = new List<ChapterNode>();
             var stack = new Dictionary<int, ChapterNode>();
-            foreach (var raw in lines)
+            for (int i = 0; i < lines.Length; i++)
             {
+                var raw = lines[i];
                 var line = raw.TrimEnd();
                 var m = System.Text.RegularExpressions.Regex.Match(line, @"^\s{0,3}(#{1,6})\s+(.*\S)\s*$");
                 if (!m.Success) continue;
                 var level = m.Groups[1].Value.Length; // 1..6
                 var text = m.Groups[2].Value.Trim();
                 // Limpiar prefijos numéricos del texto del encabezado para evitar duplicación
-                // p.ej. "1.1 Introducción" -> "Introducción". En H2 solemos permitir "Capítulo N: ...".
                 text = CleanHeadingText(text, level);
                 if (level == 1)
                 {
@@ -269,6 +269,7 @@ public class BookGenerator : IBookFlowOrchestrator
                 }
 
                 var node = new ChapterNode { Title = text };
+                // Adjuntar a la jerarquía según el nivel
                 if (level == 2)
                 {
                     toc.Add(node);
@@ -287,11 +288,44 @@ public class BookGenerator : IBookFlowOrchestrator
                     stack[4] = node;
                     stack.Remove(5); stack.Remove(6);
                 }
-                else if (level >= 5)
+                else // level >= 5
                 {
                     if (stack.TryGetValue(4, out var parent)) parent.SubChapters.Add(node);
                     stack[5] = node;
                 }
+
+                // Intentar capturar un sumario inline justo debajo del encabezado
+                // Regla: tomar el primer párrafo inmediatamente posterior (ignorando líneas en blanco iniciales),
+                // hasta la primera línea en blanco, el próximo encabezado, una lista o un bloque de código.
+                var sbSum = new System.Text.StringBuilder();
+                int k = i + 1;
+                // Saltar líneas en blanco iniciales entre el encabezado y el párrafo del resumen
+                while (k < lines.Length && string.IsNullOrWhiteSpace(lines[k])) k++;
+                bool sawNonEmpty = false;
+                while (k < lines.Length)
+                {
+                    var peek = lines[k];
+                    if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+")) break; // siguiente encabezado
+                    var t = peek.TrimStart();
+                    if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^(?:[-*+]\s+|\d+\.\s+|```|~~~)")) break; // lista o código
+                    if (string.IsNullOrWhiteSpace(peek))
+                    {
+                        if (sawNonEmpty) break; // fin del primer párrafo
+                        // si aún no vimos contenido, seguir saltando blancos
+                        k++;
+                        continue;
+                    }
+                    sbSum.AppendLine(peek.TrimEnd());
+                    sawNonEmpty = true;
+                    k++;
+                }
+                var inlineSummary = sbSum.ToString().Trim();
+                if (!string.IsNullOrWhiteSpace(inlineSummary))
+                {
+                    node.Summary = inlineSummary;
+                }
+
+                // Continuar el bucle desde la línea actual (no saltamos k para no perder subniveles entre medias)
             }
             if (toc.Count > 0)
             {
@@ -490,7 +524,10 @@ public class BookGenerator : IBookFlowOrchestrator
                     var (node, _) = FindNode(_spec.TableOfContents, prop.Name);
                     if (node != null)
                     {
-                        node.Summary = prop.Value.GetString() ?? "";
+                        if (string.IsNullOrWhiteSpace(node.Summary))
+                        {
+                            node.Summary = prop.Value.GetString() ?? "";
+                        }
                         count++;
                     }
                 }
