@@ -297,10 +297,11 @@ public class BookGenerator : IBookFlowOrchestrator
                 // Detectar numeración explícita al inicio
                 string nodeNumber = string.Empty;
                 string text;
-                var mnum = System.Text.RegularExpressions.Regex.Match(origText, @"^\s*(\d+(?:\.\d+)*)\s+(.*)$");
+                // Soporta: "1 Título", "1. Título", "1.1 Título", "1.1. Título"
+                var mnum = System.Text.RegularExpressions.Regex.Match(origText, @"^\s*(\d+(?:\.\d+)*\.?)[\)]?\s+(.*)$");
                 if (mnum.Success)
                 {
-                    nodeNumber = mnum.Groups[1].Value.Trim();
+                    nodeNumber = mnum.Groups[1].Value.Trim().TrimEnd('.');
                     text = mnum.Groups[2].Value.Trim();
                 }
                 else
@@ -364,6 +365,7 @@ public class BookGenerator : IBookFlowOrchestrator
                     else
                     {
                         // Si no encontramos padre por número, degradar a raíz
+                        _logger.LogWarning("No se encontró padre por numeración '{Parent}' para nodo '{Num} {Title}'. Se colocará en raíz.", parentNum, nodeNumber, text);
                         toc.Add(node);
                     }
                     byNumber[nodeNumber] = node;
@@ -764,7 +766,7 @@ public class BookGenerator : IBookFlowOrchestrator
         {
             var sum = string.IsNullOrWhiteSpace(node.Summary) ? "(sin sumario)" : node.Summary.Replace('\n', ' ').Trim();
             if (sum.Length > 160) sum = sum.Substring(0, 157) + "...";
-            _ui.WriteLine($"{indent}{node.Number} {node.Title} — {sum}");
+            _ui.WriteLine($"{indent}{node.Title} — {sum}");
             if (node.SubChapters.Any())
             {
                 DisplayToc(node.SubChapters, indent + "  ");
