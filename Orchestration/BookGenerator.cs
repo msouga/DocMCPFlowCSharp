@@ -378,6 +378,15 @@ public class BookGenerator : IBookFlowOrchestrator
                     toc = listToc;
                 }
             }
+            if (toc.Count == 0)
+            {
+                // Fallback: intentar parsear líneas numeradas tipo "1 Título", "1.1 Subtítulo", etc.
+                var numToc = ParseTocFromNumberedLines(lines);
+                if (numToc.Count > 0)
+                {
+                    toc = numToc;
+                }
+            }
             if (toc.Count > 0)
             {
                 _spec.TableOfContents = toc;
@@ -469,6 +478,76 @@ public class BookGenerator : IBookFlowOrchestrator
             {
                 var peek = lines[k];
                 if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+") || System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s*-\s+")) break;
+                if (!string.IsNullOrWhiteSpace(peek)) { sb.AppendLine(peek.TrimEnd()); sawAny = true; }
+                k++;
+            }
+            var sum = sb.ToString().Trim();
+            if (sawAny && !string.IsNullOrWhiteSpace(sum)) node.Summary = sum;
+        }
+        return toc;
+    }
+
+    // Fallback para índices con numeración ("1 Título", "1.1 Subtítulo", ...)
+    private List<ChapterNode> ParseTocFromNumberedLines(string[] lines)
+    {
+        var toc = new List<ChapterNode>();
+        var stack = new Dictionary<int, ChapterNode>();
+        bool inCode = false;
+        var rxNum = new System.Text.RegularExpressions.Regex(@"^\s*(\d+(?:\.\d+)*)\s+(.*\S)\s*$");
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var raw = lines[i];
+            var trimmedStart = raw.TrimStart();
+            if (trimmedStart.StartsWith("```") || trimmedStart.StartsWith("~~~"))
+            {
+                inCode = !inCode;
+                continue;
+            }
+            if (inCode) continue;
+
+            var m = rxNum.Match(raw);
+            if (!m.Success) continue;
+            var num = m.Groups[1].Value;
+            var title = m.Groups[2].Value.Trim();
+            int dotCount = num.Count(c => c == '.');
+            int level = 2 + dotCount; // 0 puntos -> H2; 1 punto -> H3; 2 -> H4
+
+            var node = new ChapterNode { Title = CleanHeadingText(title, level) };
+            if (level <= 2)
+            {
+                toc.Add(node);
+                stack[2] = node;
+                stack.Remove(3); stack.Remove(4); stack.Remove(5); stack.Remove(6);
+            }
+            else if (level == 3)
+            {
+                if (stack.TryGetValue(2, out var parent)) parent.SubChapters.Add(node);
+                stack[3] = node;
+                stack.Remove(4); stack.Remove(5); stack.Remove(6);
+            }
+            else if (level == 4)
+            {
+                if (stack.TryGetValue(3, out var parent)) parent.SubChapters.Add(node);
+                stack[4] = node;
+                stack.Remove(5); stack.Remove(6);
+            }
+            else
+            {
+                if (stack.TryGetValue(4, out var parent)) parent.SubChapters.Add(node);
+                stack[5] = node;
+            }
+
+            // Capturar resumen debajo hasta próxima línea numerada, encabezado o bullet
+            var sb = new StringBuilder();
+            int k = i + 1;
+            while (k < lines.Length && string.IsNullOrWhiteSpace(lines[k])) k++;
+            bool sawAny = false;
+            while (k < lines.Length)
+            {
+                var peek = lines[k];
+                if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+") ||
+                    System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s*-\s+") ||
+                    rxNum.IsMatch(peek)) break;
                 if (!string.IsNullOrWhiteSpace(peek)) { sb.AppendLine(peek.TrimEnd()); sawAny = true; }
                 k++;
             }
