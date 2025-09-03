@@ -34,7 +34,7 @@ public class BookGenerator : IBookFlowOrchestrator
         CollectInitialInputs();
         _logger.LogInformation("Entradas iniciales — Título: '{Title}', Público: '{Audience}', Tema: '{Topic}'", _spec.Title, _spec.TargetAudience, _spec.Topic);
         await GenerateTableOfContents();
-        if (!_tocLoadedFromFile)
+        if (!_tocLoadedFromFile && !RunContext.ExecutionParametersLoaded)
         {
             DisplayAndEditTableOfContents();
         }
@@ -405,6 +405,7 @@ public class BookGenerator : IBookFlowOrchestrator
             if (toc.Count > 0)
             {
                 _spec.TableOfContents = toc;
+                EnsureSummariesPresent(_spec.TableOfContents);
                 // Métricas de estructura
                 int h2 = toc.Count;
                 int h3 = toc.Sum(c => c.SubChapters.Count);
@@ -705,11 +706,22 @@ public class BookGenerator : IBookFlowOrchestrator
     {
         foreach (var node in nodes)
         {
-            _ui.WriteLine($"{indent}{node.Number} {node.Title}");
+            var sum = string.IsNullOrWhiteSpace(node.Summary) ? "(sin sumario)" : node.Summary.Replace('\n', ' ').Trim();
+            if (sum.Length > 160) sum = sum.Substring(0, 157) + "...";
+            _ui.WriteLine($"{indent}{node.Number} {node.Title} — {sum}");
             if (node.SubChapters.Any())
             {
                 DisplayToc(node.SubChapters, indent + "  ");
             }
+        }
+    }
+
+    private void EnsureSummariesPresent(List<ChapterNode> nodes)
+    {
+        foreach (var n in nodes)
+        {
+            if (n.Summary == null) n.Summary = string.Empty;
+            if (n.SubChapters.Any()) EnsureSummariesPresent(n.SubChapters);
         }
     }
 

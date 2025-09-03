@@ -185,6 +185,30 @@ internal class Program
             var cand2 = System.IO.Path.Combine(cwd, "executionparameters.json");
             if (System.IO.File.Exists(cand1)) path = cand1;
             else if (System.IO.File.Exists(cand2)) path = cand2;
+            else
+            {
+                // Buscar últimas configuraciones ep*.config(.local) en ./back
+                try
+                {
+                    var backDir = System.IO.Path.Combine(cwd, "back");
+                    if (System.IO.Directory.Exists(backDir))
+                    {
+                        var candidates = System.IO.Directory.GetFiles(backDir, "*.config*");
+                        string? pick = null;
+                        DateTime tmax = DateTime.MinValue;
+                        foreach (var f in candidates)
+                        {
+                            var name = System.IO.Path.GetFileName(f).ToLowerInvariant();
+                            if (!name.EndsWith(".config") && !name.EndsWith(".config.local")) continue;
+                            if (!name.StartsWith("ep")) continue; // preferimos ep*.config
+                            var t = System.IO.File.GetLastWriteTime(f);
+                            if (t > tmax) { tmax = t; pick = f; }
+                        }
+                        path = pick ?? path;
+                    }
+                }
+                catch { }
+            }
         }
         if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path)) return;
 
@@ -244,6 +268,7 @@ internal class Program
             Set("TARGET_AUDIENCE", S("target_audience"));
             Set("TOPIC", S("topic"));
             Set("DOC_TITLE", S("doc_title"));
+            RunContext.ExecutionParametersLoaded = true;
         }
         catch
         {
