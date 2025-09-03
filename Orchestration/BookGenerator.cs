@@ -826,41 +826,38 @@ public class BookGenerator : IBookFlowOrchestrator
 
     private async Task GenerateSummaries()
     {
-        string previousSummary = "(ninguno)";
-        foreach (var chapter in _spec.TableOfContents)
+        // Recorre todos los nodos y genera SOLO para los que no tienen summary
+        async Task<int> EnsureSummariesFor(List<ChapterNode> nodes)
         {
-            _ui.WriteLine($"- Generando resúmenes para el bloque del capítulo {chapter.Number} {chapter.Title} ...", ConsoleColor.DarkGray);
-            var prompt = PromptBuilder.GetSummariesForChapterBlockPrompt(_spec.Title, _spec.TargetAudience, chapter, previousSummary);
-            _logger.LogInformation("LLM Summaries prompt para capítulo {Number}: '{Title}'", chapter.Number, chapter.Title);
-            
-            var summariesJson = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall, jsonSchema: "{{}}"); // Request JSON output
-
-            try
+            int generated = 0;
+            foreach (var n in nodes)
             {
-                using var doc = JsonDocument.Parse(summariesJson);
-                int count = 0;
-                foreach (var prop in doc.RootElement.EnumerateObject())
+                if (string.IsNullOrWhiteSpace(n.Summary))
                 {
-                    var (node, _) = FindNode(_spec.TableOfContents, prop.Name);
-                    if (node != null)
+                    _ui.WriteLine($"- Generando resumen para {n.Number} {n.Title} ...", ConsoleColor.DarkGray);
+                    _logger.LogInformation("LLM SingleSummary para {Number} — {Title}", n.Number, n.Title);
+                    var prompt = PromptBuilder.GetSingleSummaryPrompt(_spec.Title, _spec.TargetAudience, n);
+                    try
                     {
-                        if (string.IsNullOrWhiteSpace(node.Summary))
-                        {
-                            node.Summary = prop.Value.GetString() ?? "";
-                        }
-                        count++;
+                        var text = await _llm.AskAsync(PromptBuilder.SystemPrompt, prompt, _config.Model, _config.MaxTokensPerCall);
+                        n.Summary = (text ?? string.Empty).Trim();
+                        generated++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "No se pudo generar summary para {Number} — {Title}", n.Number, n.Title);
                     }
                 }
-                _logger.LogInformation("Resúmenes actualizados para capítulo {Number}: {Count} nodos", chapter.Number, count);
+                if (n.SubChapters.Any())
+                {
+                    generated += await EnsureSummariesFor(n.SubChapters);
+                }
             }
-            catch (JsonException ex)
-            {
-                _ui.WriteLine($"Error al procesar resúmenes JSON para el capítulo {chapter.Number}: {ex.Message}.", ConsoleColor.Yellow);
-                _logger.LogError(ex, "Error al parsear resúmenes capítulo {Number}: {Message}", chapter.Number, ex.Message);
-            }
-
-            previousSummary = chapter.Summary;
+            return generated;
         }
+
+        var total = await EnsureSummariesFor(_spec.TableOfContents);
+        _logger.LogInformation("Resúmenes generados: {Count}", total);
     }
 
     private void DisplaySummaries()

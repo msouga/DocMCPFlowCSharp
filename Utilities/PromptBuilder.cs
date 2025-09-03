@@ -117,6 +117,17 @@ Requisitos:
 
     Ejemplo de estilo (no copiar literalmente): redactar 2 párrafos que enmarquen el capítulo a alto nivel, explicando cómo se relacionan los subtemas y qué decisiones o criterios importan, sin listas ni encabezados internos.";
 
+    private const string SingleSummaryPromptTemplate = @"Genera un resumen conciso para la sección indicada, en español, sin encabezados ni listas.
+
+Contexto General:
+- Título del Documento: ""{title}""
+- Público Objetivo: {audience}
+- Sección: {number} — {sectionTitle}
+
+Requisitos:
+- Extensión objetivo: 120–220 palabras.
+- Devuelve únicamente el texto del resumen (sin JSON, sin títulos, sin viñetas).";
+
     public static string GetIndexPrompt(string title, string topic, string audience) 
     {
         return IndexPromptTemplate
@@ -198,7 +209,7 @@ Requisitos:
         {
             prevSiblingContent = parentChapter.SubChapters[idx - 1].Content ?? string.Empty;
         }
-
+        
         var targetWordsText = targetWords > 0 ? $"- Extensión objetivo: {targetWords} palabras." : "";
         var tablesHint = BuildTablesHint(subchapter.Summary);
         return SubchapterContentPromptTemplate
@@ -213,6 +224,15 @@ Requisitos:
             .Replace("{previousSiblingContent}", string.IsNullOrWhiteSpace(prevSiblingContent) ? "(sin contenido previo)" : prevSiblingContent)
             .Replace("{targetWordsText}", targetWordsText)
             .Replace("{tablesHint}", tablesHint);
+    }
+
+    public static string GetSingleSummaryPrompt(string title, string audience, ChapterNode node)
+    {
+        return SingleSummaryPromptTemplate
+            .Replace("{title}", title)
+            .Replace("{audience}", audience)
+            .Replace("{number}", node.Number)
+            .Replace("{sectionTitle}", node.Title);
     }
 
     private static string BuildTablesHint(string? summary)
