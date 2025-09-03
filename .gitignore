@@ -21,6 +21,12 @@ coverage*/
 2025*.txt
 manuscrito.md
 manuscrito_capitulos.md
+
+# Ignore execution parameters configs and ep*.config
+# - any .config file containing 'executionparameters' in its name
+*executionparameters*.config
+# - any .config file starting with 'ep'
+ep*.config
 configurar_entorno.sh
 executionparameters.config
 executionparameters.json
