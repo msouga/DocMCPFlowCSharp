@@ -166,7 +166,8 @@ internal class Program
 
     private static void TryLoadExecutionParameters(string[]? args)
     {
-        // Orden de búsqueda: arg --params/-p, env EXECUTION_PARAMETERS_PATH, archivos por defecto en cwd
+        // Orden estricto: solo arg --params/-p o env EXECUTION_PARAMETERS_PATH.
+        // Si no se especifica explícitamente, no se cargan parámetros y se preguntará lo faltante.
         string? path = null;
         var a = args ?? Array.Empty<string>();
         for (int i = 0; i < a.Length; i++)
@@ -178,38 +179,8 @@ internal class Program
             }
         }
         path ??= Environment.GetEnvironmentVariable("EXECUTION_PARAMETERS_PATH");
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            var cwd = Environment.CurrentDirectory;
-            var cand1 = System.IO.Path.Combine(cwd, "executionparameters.config");
-            var cand2 = System.IO.Path.Combine(cwd, "executionparameters.json");
-            if (System.IO.File.Exists(cand1)) path = cand1;
-            else if (System.IO.File.Exists(cand2)) path = cand2;
-            else
-            {
-                // Buscar últimas configuraciones ep*.config(.local) en ./back
-                try
-                {
-                    var backDir = System.IO.Path.Combine(cwd, "back");
-                    if (System.IO.Directory.Exists(backDir))
-                    {
-                        var candidates = System.IO.Directory.GetFiles(backDir, "*.config*");
-                        string? pick = null;
-                        DateTime tmax = DateTime.MinValue;
-                        foreach (var f in candidates)
-                        {
-                            var name = System.IO.Path.GetFileName(f).ToLowerInvariant();
-                            if (!name.EndsWith(".config") && !name.EndsWith(".config.local")) continue;
-                            if (!name.StartsWith("ep")) continue; // preferimos ep*.config
-                            var t = System.IO.File.GetLastWriteTime(f);
-                            if (t > tmax) { tmax = t; pick = f; }
-                        }
-                        path = pick ?? path;
-                    }
-                }
-                catch { }
-            }
-        }
+        // Si no hay ruta explícita, salir (modo interactivo preguntará lo que falte)
+        if (string.IsNullOrWhiteSpace(path)) return;
         if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path)) return;
 
         try
