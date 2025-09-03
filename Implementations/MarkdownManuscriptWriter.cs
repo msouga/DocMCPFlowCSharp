@@ -63,6 +63,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         var fullText = fullManuscript.ToString();
         fullText = MaybeNormalizeWithMarkdig(fullText);
         fullText = CleanMarkdownArtifacts(fullText);
+        fullText = EnsureTableSpacing(fullText);
         if (_config.CustomBeautifyEnabled)
         {
             fullText = EnsureSpaceAfterInlineHash(fullText);
@@ -111,6 +112,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             var onlyChaptersText = onlyChapters.ToString();
             onlyChaptersText = MaybeNormalizeWithMarkdig(onlyChaptersText);
             onlyChaptersText = CleanMarkdownArtifacts(onlyChaptersText);
+            onlyChaptersText = EnsureTableSpacing(onlyChaptersText);
             if (_config.CustomBeautifyEnabled)
             {
                 onlyChaptersText = EnsureSpaceAfterInlineHash(onlyChaptersText);
@@ -572,6 +574,125 @@ private static string SanitizeInternalHeadings(string content, string number, st
             // En caso de cualquier problema con Markdig, devolver el texto original
             return input;
         }
+    }
+
+    // Asegura exactamente una línea en blanco antes y después de tablas (pipe y grid),
+    // y colapsa múltiples líneas en blanco alrededor de la tabla a solo una.
+    private static string EnsureTableSpacing(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var sb = new StringBuilder(content.Length + 64);
+        bool inCode = false;
+        bool inPipeTable = false;
+        bool inGridTable = false;
+
+        var pipeSep = new Regex(@"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$");
+        var pipeRow = new Regex(@"^\s*\|.*\|\s*$");
+        var gridBorder = new Regex(@"^\s*\+[-+]+\+\s*$");
+        var gridRow = new Regex(@"^\s*\|.*\|\s*$");
+
+        void EnsureOneBlankBefore()
+        {
+            var txt = sb.ToString();
+            int len = txt.Length;
+            if (len == 0) { sb.AppendLine(""); return; }
+            int nlCount = 0;
+            for (int i = len - 1; i >= 0 && txt[i] == '\n'; i--) nlCount++;
+            if (nlCount == 0) sb.AppendLine("");
+            else if (nlCount > 1)
+            {
+                while (nlCount-- > 1)
+                {
+                    if (sb.Length > 0) sb.Length--;
+                }
+            }
+        }
+
+        void EnsureOneBlankAfter()
+        {
+            var txt = sb.ToString();
+            int len = txt.Length;
+            if (len == 0) { sb.AppendLine(""); return; }
+            int nlCount = 0;
+            for (int i = len - 1; i >= 0 && txt[i] == '\n'; i--) nlCount++;
+            if (nlCount == 0) sb.AppendLine("");
+            else if (nlCount > 1)
+            {
+                while (nlCount-- > 1)
+                {
+                    if (sb.Length > 0) sb.Length--;
+                }
+            }
+        }
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith("```") || trimmed.StartsWith("~~~"))
+            {
+                inCode = !inCode;
+                sb.AppendLine(line);
+                continue;
+            }
+            if (inCode)
+            {
+                sb.AppendLine(line);
+                continue;
+            }
+
+            bool isGridBorder = gridBorder.IsMatch(line);
+            bool isGridRow = gridRow.IsMatch(line);
+            bool isPipeSep = pipeSep.IsMatch(line);
+            bool isPipeRow = pipeRow.IsMatch(line);
+
+            if (!inGridTable && !inPipeTable)
+            {
+                if (isGridBorder)
+                {
+                    inGridTable = true;
+                    EnsureOneBlankBefore();
+                    sb.AppendLine(line);
+                    continue;
+                }
+                if (isPipeSep)
+                {
+                    inPipeTable = true;
+                    EnsureOneBlankBefore();
+                    sb.AppendLine(line);
+                    continue;
+                }
+            }
+
+            if (inGridTable)
+            {
+                if (isGridBorder || isGridRow)
+                {
+                    sb.AppendLine(line);
+                    continue;
+                }
+                inGridTable = false;
+                EnsureOneBlankAfter();
+                // fallthrough
+            }
+
+            if (inPipeTable)
+            {
+                if (isPipeRow || isPipeSep)
+                {
+                    sb.AppendLine(line);
+                    continue;
+                }
+                inPipeTable = false;
+                EnsureOneBlankAfter();
+                // fallthrough
+            }
+
+            sb.AppendLine(line);
+        }
+
+        return sb.ToString().TrimEnd('\n').Replace("\n", System.Environment.NewLine);
     }
 
     private static bool HasPipeTable(string text)

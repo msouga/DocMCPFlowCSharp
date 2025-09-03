@@ -1077,6 +1077,7 @@ public class BookGenerator : IBookFlowOrchestrator
         var finalDoc = string.IsNullOrWhiteSpace(appendix) ? suggestions : suggestions + "\n\n" + appendix;
         // Asegurar formato correcto de fences: línea en blanco antes de abrir y después de cerrar
         finalDoc = EnsureFencesSpacing(finalDoc);
+        finalDoc = EnsureTableSpacing(finalDoc);
         // Normalizar/embellecer Markdown para graficos_sugeridos
         finalDoc = MaybeNormalizeWithMarkdig(finalDoc);
         finalDoc = CleanMarkdownArtifacts(finalDoc);
@@ -1251,6 +1252,60 @@ public class BookGenerator : IBookFlowOrchestrator
             }
 
             sb.Append(line).Append(nl);
+        }
+        return sb.ToString().TrimEnd('\n');
+    }
+
+    private static string EnsureTableSpacing(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var sb = new StringBuilder(content.Length + 64);
+        bool inCode = false, inPipe = false, inGrid = false;
+        var pipeSep = new Regex(@"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$");
+        var pipeRow = new Regex(@"^\s*\|.*\|\s*$");
+        var gridBorder = new Regex(@"^\s*\+[-+]+\+\s*$");
+        var gridRow = new Regex(@"^\s*\|.*\|\s*$");
+
+        void OneBlankBefore()
+        {
+            var txt = sb.ToString();
+            int nl = 0; for (int i = txt.Length - 1; i >= 0 && txt[i] == '\n'; i--) nl++;
+            if (nl == 0) sb.AppendLine("");
+            else if (nl > 1) { while (nl-- > 1 && sb.Length > 0) sb.Length--; }
+        }
+        void OneBlankAfter()
+        {
+            var txt = sb.ToString();
+            int nl = 0; for (int i = txt.Length - 1; i >= 0 && txt[i] == '\n'; i--) nl++;
+            if (nl == 0) sb.AppendLine("");
+            else if (nl > 1) { while (nl-- > 1 && sb.Length > 0) sb.Length--; }
+        }
+
+        foreach (var line in lines)
+        {
+            var t = line.TrimStart();
+            if (t.StartsWith("```") || t.StartsWith("~~~")) { inCode = !inCode; sb.AppendLine(line); continue; }
+            if (inCode) { sb.AppendLine(line); continue; }
+
+            bool gb = gridBorder.IsMatch(line), gr = gridRow.IsMatch(line);
+            bool ps = pipeSep.IsMatch(line), pr = pipeRow.IsMatch(line);
+            if (!inGrid && !inPipe)
+            {
+                if (gb) { inGrid = true; OneBlankBefore(); sb.AppendLine(line); continue; }
+                if (ps) { inPipe = true; OneBlankBefore(); sb.AppendLine(line); continue; }
+            }
+            if (inGrid)
+            {
+                if (gb || gr) { sb.AppendLine(line); continue; }
+                inGrid = false; OneBlankAfter();
+            }
+            if (inPipe)
+            {
+                if (ps || pr) { sb.AppendLine(line); continue; }
+                inPipe = false; OneBlankAfter();
+            }
+            sb.AppendLine(line);
         }
         return sb.ToString().TrimEnd('\n');
     }
