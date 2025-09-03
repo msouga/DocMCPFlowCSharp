@@ -23,4 +23,5 @@ public interface IConfiguration
     bool CustomBeautifyEnabled { get; }
     bool StripLinks { get; }
     bool EnableTables { get; }
+    bool RespectToc { get; }
 }

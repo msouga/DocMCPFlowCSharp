@@ -29,4 +29,5 @@ public class EnvironmentConfiguration : IConfiguration
     public bool CustomBeautifyEnabled => (Environment.GetEnvironmentVariable("CUSTOM_MD_BEAUTIFY") ?? "true").Trim().ToLowerInvariant() == "true";
     public bool StripLinks => (Environment.GetEnvironmentVariable("STRIP_LINKS") ?? "false").Trim().ToLowerInvariant() == "true";
     public bool EnableTables => (Environment.GetEnvironmentVariable("ENABLE_TABLES") ?? "true").Trim().ToLowerInvariant() == "true";
+    public bool RespectToc => (Environment.GetEnvironmentVariable("RESPECT_TOC") ?? "true").Trim().ToLowerInvariant() == "true";
 }

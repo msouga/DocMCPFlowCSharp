@@ -144,6 +144,7 @@ internal class Program
         var idx = string.IsNullOrWhiteSpace(config.IndexMdPath) ? "(none)" : config.IndexMdPath!;
         lines.Add($"INDEX_MD_PATH: {mark("INDEX_MD_PATH", idx)}");
         lines.Add($"CUSTOM_MD_BEAUTIFY: {mark("CUSTOM_MD_BEAUTIFY", valBool(config.CustomBeautifyEnabled))}");
+        lines.Add($"RESPECT_TOC: {mark("RESPECT_TOC", valBool(config.RespectToc))}");
         lines.Add($"PrevChapterTailChars: {config.PrevChapterTailChars} (Default)");
         lines.Add($"STRIP_LINKS: {mark("STRIP_LINKS", config.StripLinks ? "true" : "false")}");
         var ta = Environment.GetEnvironmentVariable("TARGET_AUDIENCE");

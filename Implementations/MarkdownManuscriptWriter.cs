@@ -183,7 +183,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
             var content = node.Content ?? string.Empty;
             // Sanitizar encabezados internos: ajustarlos a un nivel relativo al encabezado del nodo
             // y evitar duplicar el título del propio nodo.
-            content = SanitizeInternalHeadings(content, node.Number, node.Title, headerLevel, isLeaf: !node.SubChapters.Any());
+            content = SanitizeInternalHeadings(content, node.Number, node.Title, headerLevel, isLeaf: !node.SubChapters.Any(), respectToc: _config.RespectToc);
             if (_config.CustomBeautifyEnabled)
             {
                 // Asegurar separación entre ':' y la siguiente que inicia con backticks
@@ -229,7 +229,7 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         }
     }
 
-    private static string SanitizeInternalHeadings(string content, string number, string title, int parentHeaderLevel, bool isLeaf)
+private static string SanitizeInternalHeadings(string content, string number, string title, int parentHeaderLevel, bool isLeaf, bool respectToc)
     {
         if (string.IsNullOrWhiteSpace(content)) return content;
         var lines = content.Replace("\r\n", "\n").Split('\n');
@@ -347,25 +347,31 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
                 continue;
             }
 
-            // Convertir líneas que son rótulos de sección con numeración en encabezados internos
-            var mNum = Regex.Match(line, @"^\s*(\d+(?:\.\d+)*)\s+(\S.*)$");
-            if (mNum.Success)
+            // Convertir líneas numeradas en encabezados internos (solo si respectToc=false)
+            if (!respectToc)
             {
-                var text = mNum.Groups[2].Value.TrimEnd();
-                var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
-                line = new string('#', internalLevel) + " " + text;
-                result.AppendLine(line);
-                continue;
+                var mNum = Regex.Match(line, @"^\s*(\d+(?:\.\d+)*)\s+(\S.*)$");
+                if (mNum.Success)
+                {
+                    var text = mNum.Groups[2].Value.TrimEnd();
+                    var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
+                    line = new string('#', internalLevel) + " " + text;
+                    result.AppendLine(line);
+                    continue;
+                }
             }
 
-            // Opcional: etiquetas comunes sin numeración que suelen ser rótulos
-            if (Regex.IsMatch(line.Trim(), @"^(Descripci[oó]n\s+general|Resumen|Introducci[oó]n)\s*$", RegexOptions.IgnoreCase))
+            // Opcional: etiquetas comunes sin numeración que suelen ser rótulos (solo si respectToc=false)
+            if (!respectToc)
             {
-                var text = line.Trim();
-                var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
-                line = new string('#', internalLevel) + " " + text;
-                result.AppendLine(line);
-                continue;
+                if (Regex.IsMatch(line.Trim(), @"^(Descripci[oó]n\s+general|Resumen|Introducci[oó]n)\s*$", RegexOptions.IgnoreCase))
+                {
+                    var text = line.Trim();
+                    var internalLevel = Math.Min(parentHeaderLevel + 1, 6);
+                    line = new string('#', internalLevel) + " " + text;
+                    result.AppendLine(line);
+                    continue;
+                }
             }
 
             // Heurística para hojas: líneas cortas que actúan como encabezado para una lista posterior
