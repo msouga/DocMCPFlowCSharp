@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Markdig;
+using Markdig.Renderers.Normalize;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -752,6 +755,15 @@ public class BookGenerator : IBookFlowOrchestrator
         var finalDoc = string.IsNullOrWhiteSpace(appendix) ? suggestions : suggestions + "\n\n" + appendix;
         // Asegurar formato correcto de fences: línea en blanco antes de abrir y después de cerrar
         finalDoc = EnsureFencesSpacing(finalDoc);
+        // Normalizar/embellecer Markdown para graficos_sugeridos
+        finalDoc = MaybeNormalizeWithMarkdig(finalDoc);
+        finalDoc = CleanMarkdownArtifacts(finalDoc);
+        if (_config.CustomBeautifyEnabled)
+        {
+            finalDoc = EnsureSpaceAfterInlineHash(finalDoc);
+            finalDoc = FixColonBacktickSpacing(finalDoc);
+            finalDoc = BeautifyLists(finalDoc);
+        }
 
         if (!string.IsNullOrEmpty(RunContext.BackRunDirectory))
         {
@@ -919,5 +931,196 @@ public class BookGenerator : IBookFlowOrchestrator
             sb.Append(line).Append(nl);
         }
         return sb.ToString().TrimEnd('\n');
+    }
+
+    private static string NormalizeWithMarkdig(string input)
+    {
+        try
+        {
+            var pipeline = new MarkdownPipelineBuilder()
+                .UseAdvancedExtensions()
+                .Build();
+
+            var doc = Markdown.Parse(input, pipeline);
+            using var sw = new StringWriter();
+            var renderer = new NormalizeRenderer(sw);
+            pipeline.Setup(renderer);
+            renderer.Write(doc);
+            return sw.ToString();
+        }
+        catch
+        {
+            return input;
+        }
+    }
+
+    private static bool HasPipeTable(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        var t = text.Replace("\r\n", "\n");
+        var hasPipes = Regex.IsMatch(t, @"^\s*\|.*\|\s*$", RegexOptions.Multiline);
+        var hasSep = Regex.IsMatch(t, @"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$", RegexOptions.Multiline);
+        return hasPipes && hasSep;
+    }
+
+    private static bool HasGridTable(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        var t = text.Replace("\r\n", "\n");
+        var hasBorder = Regex.IsMatch(t, @"^\s*\+[-+]+\+\s*$", RegexOptions.Multiline);
+        var hasCols = Regex.IsMatch(t, @"^\s*\|.*\|\s*$", RegexOptions.Multiline);
+        return hasBorder && hasCols;
+    }
+
+    private static string MaybeNormalizeWithMarkdig(string input)
+    {
+        try
+        {
+            if (HasPipeTable(input) || HasGridTable(input))
+            {
+                return input;
+            }
+        }
+        catch { }
+        return NormalizeWithMarkdig(input);
+    }
+
+    private static string CleanMarkdownArtifacts(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var sb = new StringBuilder(content.Length);
+        var emptyRefRx = new Regex(@"^\s*\[\s*\]\s*:\s*.*$", RegexOptions.Compiled);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (emptyRefRx.IsMatch(line)) continue;
+            sb.AppendLine(line);
+        }
+        var text = sb.ToString();
+        text = text.TrimEnd('\n', '\r');
+        text += "\n";
+        return text.Replace("\n", System.Environment.NewLine);
+    }
+
+    private static string FixColonBacktickSpacing(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return content;
+        var text = content.Replace("\r\n", "\n");
+        text = Regex.Replace(text, @":\n(?!\n)", ":\n\n", RegexOptions.Multiline);
+        return text.Replace("\n", System.Environment.NewLine);
+    }
+
+    private static string BeautifyLists(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var result = new StringBuilder(content.Length + 64);
+        bool inCode = false;
+        string prevNonBlankLine = "";
+        bool prevNonBlankIsBullet = false;
+        int prevNonBlankBulletIndent = -1;
+        bool lastEmittedBlank = false;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (line.TrimStart().StartsWith("```") || line.TrimStart().StartsWith("~~~"))
+            {
+                inCode = !inCode;
+                result.AppendLine(line);
+                continue;
+            }
+            if (inCode)
+            {
+                result.AppendLine(line);
+                continue;
+            }
+            var m = Regex.Match(line, @"^(\s*)-\s+");
+            bool isBullet = m.Success;
+            int indent = isBullet ? m.Groups[1].Value.Length : -1;
+            if (isBullet)
+            {
+                if (!string.IsNullOrWhiteSpace(prevNonBlankLine))
+                {
+                    if (!prevNonBlankIsBullet)
+                    {
+                        if (!lastEmittedBlank)
+                        {
+                            result.AppendLine("");
+                            lastEmittedBlank = true;
+                        }
+                    }
+                    else
+                    {
+                        if (indent > prevNonBlankBulletIndent && prevNonBlankLine.TrimEnd().EndsWith(":"))
+                        {
+                            if (!lastEmittedBlank)
+                            {
+                                result.AppendLine("");
+                                lastEmittedBlank = true;
+                            }
+                        }
+                    }
+                }
+            }
+            result.AppendLine(line);
+            lastEmittedBlank = string.IsNullOrWhiteSpace(line);
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                prevNonBlankLine = line;
+                prevNonBlankIsBullet = isBullet;
+                prevNonBlankBulletIndent = isBullet ? indent : -1;
+            }
+        }
+
+        return result.ToString().TrimEnd('\n').Replace("\n", System.Environment.NewLine);
+    }
+
+    private static string EnsureSpaceAfterInlineHash(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return content;
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var sb = new StringBuilder(content.Length + 64);
+        bool inCode = false;
+        var rxLetterOrDigit = new Regex(@"\b([A-Za-zÁÉÍÓÚÜáéíóúÑñ]+)#([A-Za-zÁÉÍÓÚÜáéíóúÑñ0-9])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        var rxHashAtEnd    = new Regex(@"\b([A-Za-zÁÉÍÓÚÜáéíóúÑñ]+)#\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        // TODO: Ampliar soporte si se requiere notación musical avanzada.
+        var noteRoots = new HashSet<string>(new[]{
+            "a","b","c","d","e","f","g",
+            "do","re","mi","fa","sol","la","si"
+        }, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var raw in lines)
+        {
+            var line = raw;
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith("```") || trimmed.StartsWith("~~~"))
+            {
+                inCode = !inCode;
+                sb.AppendLine(line);
+                continue;
+            }
+            if (inCode)
+            {
+                sb.AppendLine(line);
+                continue;
+            }
+
+            line = rxLetterOrDigit.Replace(line, m => {
+                var left = m.Groups[1].Value;
+                var right = m.Groups[2].Value;
+                if (noteRoots.Contains(left)) return m.Value; // no tocar notación musical
+                return left + "# " + right;
+            });
+            line = rxHashAtEnd.Replace(line, m => {
+                var left = m.Groups[1].Value;
+                return left + "# ";
+            });
+
+            sb.AppendLine(line);
+        }
+
+        return sb.ToString().TrimEnd('\n').Replace("\n", System.Environment.NewLine);
     }
 }
