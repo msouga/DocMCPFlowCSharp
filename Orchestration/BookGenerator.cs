@@ -285,6 +285,7 @@ public class BookGenerator : IBookFlowOrchestrator
             _logger.LogDebug("Preview índice (primeras 25 líneas):\n{Preview}", preview);
             var toc = new List<ChapterNode>();
             var stack = new Dictionary<int, ChapterNode>();
+            var byNumber = new Dictionary<string, ChapterNode>(StringComparer.Ordinal);
             for (int i = 0; i < lines.Length; i++)
             {
                 var raw = lines[i];
@@ -292,59 +293,100 @@ public class BookGenerator : IBookFlowOrchestrator
                 var m = System.Text.RegularExpressions.Regex.Match(line, @"^\s{0,3}(#{1,6})\s+(.*\S)\s*$");
                 if (!m.Success) continue;
                 var level = m.Groups[1].Value.Length; // 1..6
-                var text = m.Groups[2].Value.Trim();
-                // Limpiar prefijos numéricos del texto del encabezado para evitar duplicación
-                text = CleanHeadingText(text, level);
+                var origText = m.Groups[2].Value.Trim();
+                // Detectar numeración explícita al inicio
+                string nodeNumber = string.Empty;
+                string text;
+                var mnum = System.Text.RegularExpressions.Regex.Match(origText, @"^\s*(\d+(?:\.\d+)*)\s+(.*)$");
+                if (mnum.Success)
+                {
+                    nodeNumber = mnum.Groups[1].Value.Trim();
+                    text = mnum.Groups[2].Value.Trim();
+                }
+                else
+                {
+                    // Limpiar prefijos numéricos del texto del encabezado para evitar duplicación
+                    text = CleanHeadingText(origText, level);
+                }
                 if (level == 1)
                 {
-                    if (string.IsNullOrWhiteSpace(_spec.Title)) _spec.Title = text;
-                    // Capturar descripción global si todavía no fue detectada
-                    if (string.IsNullOrWhiteSpace(_spec.ManualSummary))
+                    // Primer H1: título global; H1 posteriores: capítulos raíz
+                    if (string.IsNullOrWhiteSpace(_spec.Title))
                     {
-                        var descSb = new StringBuilder();
-                        int kdesc = i + 1;
-                        while (kdesc < lines.Length && string.IsNullOrWhiteSpace(lines[kdesc])) kdesc++; // borrar líneas en blanco
-                        while (kdesc < lines.Length)
+                        _spec.Title = text;
+                        // Capturar descripción global si todavía no fue detectada
+                        if (string.IsNullOrWhiteSpace(_spec.ManualSummary))
                         {
-                            var peek = lines[kdesc];
-                            if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+")) break; // próximo encabezado
-                            if (!string.IsNullOrWhiteSpace(peek)) descSb.AppendLine(peek.TrimEnd());
-                            kdesc++;
+                            var descSb = new StringBuilder();
+                            int kdesc = i + 1;
+                            while (kdesc < lines.Length && string.IsNullOrWhiteSpace(lines[kdesc])) kdesc++; // borrar líneas en blanco
+                            while (kdesc < lines.Length)
+                            {
+                                var peek = lines[kdesc];
+                                if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+")) break; // próximo encabezado
+                                if (!string.IsNullOrWhiteSpace(peek)) descSb.AppendLine(peek.TrimEnd());
+                                kdesc++;
+                            }
+                            var desc = descSb.ToString().Trim();
+                            if (!string.IsNullOrWhiteSpace(desc))
+                            {
+                                _spec.ManualSummary = desc;
+                                if (string.IsNullOrWhiteSpace(_spec.Topic)) _spec.Topic = desc;
+                            }
                         }
-                        var desc = descSb.ToString().Trim();
-                        if (!string.IsNullOrWhiteSpace(desc))
-                        {
-                            _spec.ManualSummary = desc;
-                            if (string.IsNullOrWhiteSpace(_spec.Topic)) _spec.Topic = desc;
-                        }
+                        continue; // Primer H1 es título global
                     }
-                    continue; // H1 es título global
+                    // Si ya hay título, tratamos este H1 como capítulo raíz
                 }
 
                 var node = new ChapterNode { Title = text };
-                // Adjuntar a la jerarquía según el nivel
-                if (level == 2)
+                if (!string.IsNullOrWhiteSpace(nodeNumber)) node.Number = nodeNumber;
+                // Adjuntar por numeración si existe; si no, por nivel de encabezado
+                if (!string.IsNullOrWhiteSpace(nodeNumber))
                 {
-                    toc.Add(node);
-                    stack[2] = node;
-                    stack.Remove(3); stack.Remove(4); stack.Remove(5); stack.Remove(6);
+                    var parentNum = nodeNumber.Contains('.') ? nodeNumber.Substring(0, nodeNumber.LastIndexOf('.')) : string.Empty;
+                    if (string.IsNullOrEmpty(parentNum))
+                    {
+                        toc.Add(node);
+                    }
+                    else if (byNumber.TryGetValue(parentNum, out var pnum))
+                    {
+                        pnum.SubChapters.Add(node);
+                    }
+                    else
+                    {
+                        // Si no encontramos padre por número, degradar a raíz
+                        toc.Add(node);
+                    }
+                    byNumber[nodeNumber] = node;
                 }
-                else if (level == 3)
+                else
                 {
-                    if (stack.TryGetValue(2, out var parent)) parent.SubChapters.Add(node);
-                    stack[3] = node;
-                    stack.Remove(4); stack.Remove(5); stack.Remove(6);
-                }
-                else if (level == 4)
-                {
-                    if (stack.TryGetValue(3, out var parent)) parent.SubChapters.Add(node);
-                    stack[4] = node;
-                    stack.Remove(5); stack.Remove(6);
-                }
-                else // level >= 5
-                {
-                    if (stack.TryGetValue(4, out var parent)) parent.SubChapters.Add(node);
-                    stack[5] = node;
+                    // Jerarquía por niveles MD (ajustada: H1 posteriores tratados como H2)
+                    int effLevel = (level == 1 && !string.IsNullOrWhiteSpace(_spec.Title)) ? 2 : level;
+                    if (effLevel == 2)
+                    {
+                        toc.Add(node);
+                        stack[2] = node;
+                        stack.Remove(3); stack.Remove(4); stack.Remove(5); stack.Remove(6);
+                    }
+                    else if (effLevel == 3)
+                    {
+                        if (stack.TryGetValue(2, out var parent)) parent.SubChapters.Add(node);
+                        stack[3] = node;
+                        stack.Remove(4); stack.Remove(5); stack.Remove(6);
+                    }
+                    else if (effLevel == 4)
+                    {
+                        if (stack.TryGetValue(3, out var parent)) parent.SubChapters.Add(node);
+                        stack[4] = node;
+                        stack.Remove(5); stack.Remove(6);
+                    }
+                    else // effLevel >= 5
+                    {
+                        if (stack.TryGetValue(4, out var parent)) parent.SubChapters.Add(node);
+                        stack[5] = node;
+                    }
                 }
 
                 // Intentar capturar un sumario inline justo debajo del encabezado
@@ -748,11 +790,16 @@ public class BookGenerator : IBookFlowOrchestrator
         {
             var node = nodes[i];
             var currentNumber = $"{prefix}{i + 1}";
-            node.Number = currentNumber;
+            // Respetar numeración existente si viene del índice; sólo asignar si está vacío
+            if (string.IsNullOrWhiteSpace(node.Number))
+            {
+                node.Number = currentNumber;
+            }
             node.Level = level;
             if (node.SubChapters.Any())
             {
-                NumberNodes(node.SubChapters, currentNumber + ".", level + 1);
+                var nextPrefix = string.IsNullOrWhiteSpace(node.Number) ? currentNumber + "." : node.Number + ".";
+                NumberNodes(node.SubChapters, nextPrefix, level + 1);
             }
         }
     }
