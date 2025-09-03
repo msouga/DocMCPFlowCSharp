@@ -349,12 +349,27 @@ public class BookGenerator : IBookFlowOrchestrator
                 // Saltar líneas en blanco iniciales entre el encabezado y el párrafo del resumen
                 while (k < lines.Length && string.IsNullOrWhiteSpace(lines[k])) k++;
                 bool sawAny = false;
+                bool inFence = false;
                 while (k < lines.Length)
                 {
                     var peek = lines[k];
-                    if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+")) break; // siguiente encabezado
-                    // Aceptar listas y bloques de código como parte del sumario; omitir líneas en blanco
-                    if (!string.IsNullOrWhiteSpace(peek))
+                    var trimmed = peek.TrimStart();
+                    // Control de fences de código: preservar contenido tal cual dentro de fences
+                    if (trimmed.StartsWith("```") || trimmed.StartsWith("~~~"))
+                    {
+                        inFence = !inFence;
+                        sbSum.AppendLine(peek);
+                        sawAny = true;
+                        k++;
+                        continue;
+                    }
+                    if (!inFence && System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+")) break; // siguiente encabezado
+                    if (inFence)
+                    {
+                        sbSum.AppendLine(peek);
+                        sawAny = true;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(peek))
                     {
                         sbSum.AppendLine(peek.TrimEnd());
                         sawAny = true;
@@ -474,11 +489,26 @@ public class BookGenerator : IBookFlowOrchestrator
             int k = i + 1;
             while (k < lines.Length && string.IsNullOrWhiteSpace(lines[k])) k++;
             bool sawAny = false;
+            bool inFence2 = false;
             while (k < lines.Length)
             {
                 var peek = lines[k];
-                if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+") || System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s*-\s+")) break;
-                if (!string.IsNullOrWhiteSpace(peek)) { sb.AppendLine(peek.TrimEnd()); sawAny = true; }
+                var trimmed = peek.TrimStart();
+                if (trimmed.StartsWith("```") || trimmed.StartsWith("~~~"))
+                {
+                    inFence2 = !inFence2;
+                    sb.AppendLine(peek);
+                    sawAny = true;
+                    k++;
+                    continue;
+                }
+                if (!inFence2 && (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+") || System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s*-\s+"))) break;
+                if (inFence2)
+                {
+                    sb.AppendLine(peek);
+                    sawAny = true;
+                }
+                else if (!string.IsNullOrWhiteSpace(peek)) { sb.AppendLine(peek.TrimEnd()); sawAny = true; }
                 k++;
             }
             var sum = sb.ToString().Trim();
@@ -542,13 +572,28 @@ public class BookGenerator : IBookFlowOrchestrator
             int k = i + 1;
             while (k < lines.Length && string.IsNullOrWhiteSpace(lines[k])) k++;
             bool sawAny = false;
+            bool inFence3 = false;
             while (k < lines.Length)
             {
                 var peek = lines[k];
-                if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+") ||
+                var trimmed = peek.TrimStart();
+                if (trimmed.StartsWith("```") || trimmed.StartsWith("~~~"))
+                {
+                    inFence3 = !inFence3;
+                    sb.AppendLine(peek);
+                    sawAny = true;
+                    k++;
+                    continue;
+                }
+                if (!inFence3 && (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+") ||
                     System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s*-\s+") ||
-                    rxNum.IsMatch(peek)) break;
-                if (!string.IsNullOrWhiteSpace(peek)) { sb.AppendLine(peek.TrimEnd()); sawAny = true; }
+                    rxNum.IsMatch(peek))) break;
+                if (inFence3)
+                {
+                    sb.AppendLine(peek);
+                    sawAny = true;
+                }
+                else if (!string.IsNullOrWhiteSpace(peek)) { sb.AppendLine(peek.TrimEnd()); sawAny = true; }
                 k++;
             }
             var sum = sb.ToString().Trim();
