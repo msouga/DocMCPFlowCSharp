@@ -63,19 +63,22 @@ public class BookGenerator : IBookFlowOrchestrator
         await GenerateSummaries();
         DisplaySummaries();
         // Generar resumen del manual (overview del nodo raíz) usando los resúmenes de capítulos
-        try
+        if (string.IsNullOrWhiteSpace(_spec.ManualSummary))
         {
-            var rootNode = new ChapterNode { Title = _spec.Title, Number = "", SubChapters = _spec.TableOfContents };
-            var manualOverviewPrompt = PromptBuilder.GetChapterOverviewPrompt(
-                _spec.Title,
-                _spec.Topic,
-                _spec.TargetAudience,
-                rootNode,
-                "(ninguno)",
-                _config.NodeSummaryWords);
-            _spec.ManualSummary = await _llm.AskAsync(PromptBuilder.SystemPrompt, manualOverviewPrompt, _config.Model, _config.MaxTokensPerCall);
+            try
+            {
+                var rootNode = new ChapterNode { Title = _spec.Title, Number = "", SubChapters = _spec.TableOfContents };
+                var manualOverviewPrompt = PromptBuilder.GetChapterOverviewPrompt(
+                    _spec.Title,
+                    _spec.Topic,
+                    _spec.TargetAudience,
+                    rootNode,
+                    "(ninguno)",
+                    _config.NodeSummaryWords);
+                _spec.ManualSummary = await _llm.AskAsync(PromptBuilder.SystemPrompt, manualOverviewPrompt, _config.Model, _config.MaxTokensPerCall);
+            }
+            catch {}
         }
-        catch {}
         await _writer.SaveAsync(_spec);
         _logger.LogInformation("Guardado de manuscrito luego de resúmenes");
 
@@ -188,14 +191,34 @@ public class BookGenerator : IBookFlowOrchestrator
                 System.IO.File.Exists(_config.IndexMdPath))
             {
                 var path = _config.IndexMdPath!;
-                foreach (var raw in System.IO.File.ReadLines(path))
+                var all = System.IO.File.ReadAllLines(path);
+                int h1Index = -1;
+                for (int i = 0; i < all.Length; i++)
                 {
-                    var line = raw.Trim();
-                    if (line.StartsWith("# "))
+                    var t = all[i].Trim();
+                    if (t.StartsWith("# "))
                     {
-                        _spec.Title = line.Substring(2).Trim();
+                        _spec.Title = t.Substring(2).Trim();
+                        h1Index = i;
                         _logger.LogInformation("Título precargado desde INDEX_MD_PATH: {Title}", _spec.Title);
                         break;
+                    }
+                }
+                // Capturar texto debajo del título (descripción global). Borrar líneas en blanco.
+                if (h1Index >= 0)
+                {
+                    var sb = new StringBuilder();
+                    for (int k = h1Index + 1; k < all.Length; k++)
+                    {
+                        var ln = all[k];
+                        if (System.Text.RegularExpressions.Regex.IsMatch(ln, @"^\s{0,3}#{1,6}\s+")) break; // siguiente encabezado
+                        if (!string.IsNullOrWhiteSpace(ln)) sb.AppendLine(ln.TrimEnd());
+                    }
+                    var desc = sb.ToString().Trim();
+                    if (!string.IsNullOrWhiteSpace(desc))
+                    {
+                        if (string.IsNullOrWhiteSpace(_spec.Topic)) _spec.Topic = desc;
+                        if (string.IsNullOrWhiteSpace(_spec.ManualSummary)) _spec.ManualSummary = desc;
                     }
                 }
             }
@@ -269,6 +292,26 @@ public class BookGenerator : IBookFlowOrchestrator
                 if (level == 1)
                 {
                     if (string.IsNullOrWhiteSpace(_spec.Title)) _spec.Title = text;
+                    // Capturar descripción global si todavía no fue detectada
+                    if (string.IsNullOrWhiteSpace(_spec.ManualSummary))
+                    {
+                        var descSb = new StringBuilder();
+                        int kdesc = i + 1;
+                        while (kdesc < lines.Length && string.IsNullOrWhiteSpace(lines[kdesc])) kdesc++; // borrar líneas en blanco
+                        while (kdesc < lines.Length)
+                        {
+                            var peek = lines[kdesc];
+                            if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+")) break; // próximo encabezado
+                            if (!string.IsNullOrWhiteSpace(peek)) descSb.AppendLine(peek.TrimEnd());
+                            kdesc++;
+                        }
+                        var desc = descSb.ToString().Trim();
+                        if (!string.IsNullOrWhiteSpace(desc))
+                        {
+                            _spec.ManualSummary = desc;
+                            if (string.IsNullOrWhiteSpace(_spec.Topic)) _spec.Topic = desc;
+                        }
+                    }
                     continue; // H1 es título global
                 }
 
@@ -300,7 +343,7 @@ public class BookGenerator : IBookFlowOrchestrator
 
                 // Intentar capturar un sumario inline justo debajo del encabezado
                 // Regla: tomar todo el texto inmediatamente posterior (ignorando líneas en blanco iniciales)
-                // hasta el PRÓXIMO ENCABEZADO o fin de archivo. Se permiten líneas en blanco, listas y bloques de código.
+                // hasta el PRÓXIMO ENCABEZADO o fin de archivo. Se eliminan líneas en blanco para mejorar la recuperación.
                 var sbSum = new System.Text.StringBuilder();
                 int k = i + 1;
                 // Saltar líneas en blanco iniciales entre el encabezado y el párrafo del resumen
@@ -310,9 +353,12 @@ public class BookGenerator : IBookFlowOrchestrator
                 {
                     var peek = lines[k];
                     if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+")) break; // siguiente encabezado
-                    // Aceptar líneas en blanco, listas y bloques de código como parte del sumario
-                    sbSum.AppendLine(peek.TrimEnd());
-                    if (!string.IsNullOrWhiteSpace(peek)) sawAny = true;
+                    // Aceptar listas y bloques de código como parte del sumario; omitir líneas en blanco
+                    if (!string.IsNullOrWhiteSpace(peek))
+                    {
+                        sbSum.AppendLine(peek.TrimEnd());
+                        sawAny = true;
+                    }
                     k++;
                 }
                 var inlineSummary = sbSum.ToString().Trim();
