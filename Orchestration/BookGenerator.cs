@@ -369,6 +369,15 @@ public class BookGenerator : IBookFlowOrchestrator
 
                 // Continuar el bucle desde la línea actual (no saltamos k para no perder subniveles entre medias)
             }
+            if (toc.Count == 0)
+            {
+                // Fallback: intentar parsear listas con guiones como estructura ("- Capítulo", "  - Subcapítulo")
+                var listToc = ParseTocFromBulletList(lines);
+                if (listToc.Count > 0)
+                {
+                    toc = listToc;
+                }
+            }
             if (toc.Count > 0)
             {
                 _spec.TableOfContents = toc;
@@ -397,6 +406,76 @@ public class BookGenerator : IBookFlowOrchestrator
             _logger.LogWarning(ex, "Fallo al cargar TOC desde INDEX_MD_PATH");
         }
         return false;
+    }
+
+    // Fallback para índices definidos como lista con guiones (- item). Indentación con 2 espacios indica nivel.
+    private List<ChapterNode> ParseTocFromBulletList(string[] lines)
+    {
+        var toc = new List<ChapterNode>();
+        var stack = new Dictionary<int, ChapterNode>(); // nivel lógico -> nodo
+        int? baseIndent = null;
+        bool inCode = false;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var raw = lines[i];
+            var trimmedStart = raw.TrimStart();
+            // Evitar bloques de código
+            if (trimmedStart.StartsWith("```") || trimmedStart.StartsWith("~~~"))
+            {
+                inCode = !inCode;
+                continue;
+            }
+            if (inCode) continue;
+
+            var m = System.Text.RegularExpressions.Regex.Match(raw, @"^(\s*)-\s+(.*\S)\s*$");
+            if (!m.Success) continue;
+            int indent = m.Groups[1].Value.Length;
+            string text = m.Groups[2].Value.Trim();
+            if (baseIndent == null) baseIndent = indent;
+            int rel = Math.Max(0, indent - baseIndent.Value);
+            int level = 2 + (rel / 2); // 0 -> H2, 2 -> H3, 4 -> H4, etc.
+
+            var node = new ChapterNode { Title = CleanHeadingText(text, level) };
+            if (level <= 2)
+            {
+                toc.Add(node);
+                stack[2] = node;
+                stack.Remove(3); stack.Remove(4); stack.Remove(5); stack.Remove(6);
+            }
+            else if (level == 3)
+            {
+                if (stack.TryGetValue(2, out var parent)) parent.SubChapters.Add(node);
+                stack[3] = node;
+                stack.Remove(4); stack.Remove(5); stack.Remove(6);
+            }
+            else if (level == 4)
+            {
+                if (stack.TryGetValue(3, out var parent)) parent.SubChapters.Add(node);
+                stack[4] = node;
+                stack.Remove(5); stack.Remove(6);
+            }
+            else
+            {
+                if (stack.TryGetValue(4, out var parent)) parent.SubChapters.Add(node);
+                stack[5] = node;
+            }
+
+            // Capturar resumen inline no en formato bullet debajo (hasta próxima viñeta o encabezado)
+            var sb = new StringBuilder();
+            int k = i + 1;
+            while (k < lines.Length && string.IsNullOrWhiteSpace(lines[k])) k++;
+            bool sawAny = false;
+            while (k < lines.Length)
+            {
+                var peek = lines[k];
+                if (System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s{0,3}#{1,6}\s+") || System.Text.RegularExpressions.Regex.IsMatch(peek, @"^\s*-\s+")) break;
+                if (!string.IsNullOrWhiteSpace(peek)) { sb.AppendLine(peek.TrimEnd()); sawAny = true; }
+                k++;
+            }
+            var sum = sb.ToString().Trim();
+            if (sawAny && !string.IsNullOrWhiteSpace(sum)) node.Summary = sum;
+        }
+        return toc;
     }
 
     private List<ChapterNode> BuildDemoToc()
