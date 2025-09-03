@@ -177,7 +177,10 @@ public class MarkdownManuscriptWriter : IManuscriptWriter
         {
             if (includeHeaders)
             {
-                sb.AppendLine($"{headerPrefix} {node.Number} {node.Title}");
+                var num = (node.Number ?? string.Empty).Trim();
+                if (!string.IsNullOrEmpty(num) && !num.EndsWith('.')) num += ".";
+                var headingText = string.IsNullOrEmpty(num) ? node.Title : ($"{num} {node.Title}");
+                sb.AppendLine($"{headerPrefix} {headingText}");
                 sb.AppendLine();
             }
             var content = node.Content ?? string.Empty;

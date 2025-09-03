@@ -60,6 +60,7 @@ Contexto del Documento:
 
 Requisitos:
 - Escribe contenido técnico claro y preciso, adaptado al público.
+- Evita listas en lo posible; prioriza párrafos continuos y explicativos. Solo usa una lista breve si aporta claridad y es imprescindible.
 {targetWordsText}
 - La salida debe ser en formato Markdown.
 - Empieza directamente con el contenido, sin incluir ningún encabezado que repita el número o el título de la sección (p. ej.: ""#### {chapterNumber} — {chapterTitle}"", ""#### {chapterTitle}"").
@@ -84,6 +85,7 @@ Contexto:
 Requisitos:
 {targetWordsText}
 - Estructura clara. No incluyas el encabezado principal del subcapítulo (se añadirá externamente).
+- Evita listas en lo posible; prioriza párrafos. Si necesitas una lista, que sea como máximo una y muy breve.
 - Para subsecciones internas usa como máximo encabezados de cuarto nivel (####). No uses niveles 5 o 6.
 - No repitas ni incluyas encabezados con el número o el título del subcapítulo (ej.: ""#### {sectionNumber} — {sectionTitle}"", ""#### {sectionTitle}""). Comienza directamente con el contenido.
 - No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").
@@ -111,7 +113,7 @@ Requisitos:
 - La salida debe ser en formato Markdown.
 - Empieza directamente con el contenido, no repitas el título del capítulo.
 - No listes ni repitas títulos o numeraciones de subcapítulos (evita líneas como ""1.1 ..."", ""1.2 ..."").
-- Puedes usar listas y tablas Markdown si aportan claridad (por ejemplo, comparativas o resúmenes), pero evita enumerar los títulos de subcapítulos.
+- Evita listas extensas; prioriza párrafos. Solo incluye una lista breve si añade claridad real. Puedes usar tablas cuando aporten valor, pero no como sustituto de texto explicativo.
 - Redacta 2 a 4 párrafos o una combinación breve de párrafos y una tabla cuando sea pertinente.
 - No incluyas ofertas o sugerencias del asistente al lector/autor (por ejemplo: ""Si quieres, puedo…"", ""¿Quieres que…?"", ""Puedo proporcionar…"").
 
