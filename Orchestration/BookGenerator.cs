@@ -35,6 +35,7 @@ public class BookGenerator : IBookFlowOrchestrator
         // En modo unattended (parámetros cargados explícitamente), si se indicó INDEX_MD_PATH y no existe, abortar
         if (RunContext.ExecutionParametersLoaded && !string.IsNullOrWhiteSpace(_config.IndexMdPath) && !System.IO.File.Exists(_config.IndexMdPath))
         {
+            _logger.LogError("Error TOC File not found: '{Path}'", _config.IndexMdPath);
             throw new InvalidOperationException($"Error TOC File not found: '{_config.IndexMdPath}'");
         }
         _logger.LogInformation("Entradas iniciales — Título: '{Title}', Público: '{Audience}', Tema: '{Topic}'", _spec.Title, _spec.TargetAudience, _spec.Topic);
