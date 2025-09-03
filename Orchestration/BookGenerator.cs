@@ -336,7 +336,15 @@ public class BookGenerator : IBookFlowOrchestrator
                         }
                         continue; // Primer H1 es título global
                     }
-                    // Si ya hay título, tratamos este H1 como capítulo raíz
+                    // Si ya hay título, tratamos este H1 como capítulo raíz (equivalente a H2)
+                    if (!string.IsNullOrWhiteSpace(nodeNumber))
+                    {
+                        _logger.LogInformation("Normalizando H1 numerado como capítulo raíz (H2): {Num} {Title}", nodeNumber, text);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Normalizando H1 adicional como capítulo raíz (H2): {Title}", text);
+                    }
                 }
 
                 var node = new ChapterNode { Title = text };
